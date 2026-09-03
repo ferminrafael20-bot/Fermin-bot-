@@ -44,7 +44,13 @@ strategies/
 data.py                         # descarga OHLCV vía ccxt + datos sintéticos de prueba
 main.py                         # demo: aplica las 5 estrategias a los 4 símbolos
 tests/                          # pruebas unitarias con pytest
+pinescript/                     # las mismas 5 estrategias en Pine Script v5 (TradingView)
 ```
+
+## Versión Pine Script (TradingView)
+
+Las mismas 5 estrategias también están disponibles en Pine Script v5, listas
+para pegar en el Pine Editor de TradingView: ver [`pinescript/`](pinescript/).
 
 ## Uso
 

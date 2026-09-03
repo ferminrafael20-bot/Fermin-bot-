@@ -1,0 +1,38 @@
+//@version=5
+// Estrategia 1: Cruce de EMAs (9/21) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): EMA rápida (9) y EMA lenta (21) sobre el cierre.
+// Compra: la EMA rápida cruza al alza la EMA lenta.
+// Venta:  la EMA rápida cruza a la baja la EMA lenta.
+strategy("EMA Cross (9/21) - 5m Futuros", shorttitle = "EMA9/21",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT)
+
+// ---- Inputs ----
+fastLen = input.int(9,  "EMA rápida", minval = 1)
+slowLen = input.int(21, "EMA lenta",  minval = 1)
+allowLong  = input.bool(true, "Permitir compras (long)")
+allowShort = input.bool(true, "Permitir ventas en corto (short)")
+
+// ---- Indicadores ----
+emaFast = ta.ema(close, fastLen)
+emaSlow = ta.ema(close, slowLen)
+
+plot(emaFast, "EMA rápida", color = color.new(color.aqua, 0))
+plot(emaSlow, "EMA lenta",  color = color.new(color.orange, 0))
+
+// ---- Señales ----
+buySignal  = ta.crossover(emaFast, emaSlow)
+sellSignal = ta.crossunder(emaFast, emaSlow)
+
+if allowLong and buySignal
+    strategy.entry("Long", strategy.long)
+if allowShort and sellSignal
+    strategy.entry("Short", strategy.short)
+
+plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buySignal,  title = "EMA Cross BUY",  message = "EMA Cross (9/21): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellSignal, title = "EMA Cross SELL", message = "EMA Cross (9/21): señal de VENTA en {{ticker}} {{interval}}")

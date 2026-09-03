@@ -1,0 +1,41 @@
+//@version=5
+// Estrategia 4: Cruce de MACD(12,26,9) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2, integrados en el MACD): línea MACD (EMA12-EMA26) y su
+// línea de señal (EMA9 del MACD).
+// Compra: la línea MACD cruza al alza la línea de señal.
+// Venta:  la línea MACD cruza a la baja la línea de señal.
+strategy("MACD Cross (12,26,9) - 5m Futuros", shorttitle = "MACD Cross",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT)
+
+// ---- Inputs ----
+fastLen   = input.int(12, "EMA rápida (MACD)", minval = 1)
+slowLen   = input.int(26, "EMA lenta (MACD)",  minval = 1)
+signalLen = input.int(9,  "Periodo de señal",  minval = 1)
+allowLong  = input.bool(true, "Permitir compras (long)")
+allowShort = input.bool(true, "Permitir ventas en corto (short)")
+
+// ---- Indicadores ----
+[macdLine, signalLine, hist] = ta.macd(close, fastLen, slowLen, signalLen)
+
+// ---- Señales ----
+buySignal  = ta.crossover(macdLine, signalLine)
+sellSignal = ta.crossunder(macdLine, signalLine)
+
+if allowLong and buySignal
+    strategy.entry("Long", strategy.long)
+if allowShort and sellSignal
+    strategy.entry("Short", strategy.short)
+
+plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buySignal,  title = "MACD Cross BUY",  message = "MACD(12,26,9): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellSignal, title = "MACD Cross SELL", message = "MACD(12,26,9): señal de VENTA en {{ticker}} {{interval}}")
+
+// Línea MACD/señal/histograma visibles en Data Window (sin plotearlas sobre el precio)
+plot(macdLine,   "MACD",     display = display.data_window)
+plot(signalLine, "Señal",    display = display.data_window)
+plot(hist,       "Histograma", display = display.data_window)

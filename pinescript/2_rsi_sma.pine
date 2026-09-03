@@ -1,0 +1,47 @@
+//@version=5
+// Estrategia 2: RSI(14) + SMA(50) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): RSI de 14 periodos y SMA de 50 periodos sobre el cierre.
+// Compra: precio > SMA(50) (tendencia alcista) y el RSI sale de sobreventa
+//         cruzando por encima de 30 (pullback comprado).
+// Venta:  precio < SMA(50) (tendencia bajista) y el RSI sale de sobrecompra
+//         cruzando por debajo de 70 (rebote vendido / short).
+strategy("RSI(14) + SMA(50) - 5m Futuros", shorttitle = "RSI+SMA",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT)
+
+// ---- Inputs ----
+rsiLen     = input.int(14, "Periodo RSI", minval = 1)
+smaLen     = input.int(50, "Periodo SMA (tendencia)", minval = 1)
+oversold   = input.float(30, "Nivel de sobreventa")
+overbought = input.float(70, "Nivel de sobrecompra")
+allowLong  = input.bool(true, "Permitir compras (long)")
+allowShort = input.bool(true, "Permitir ventas en corto (short)")
+
+// ---- Indicadores ----
+rsiVal = ta.rsi(close, rsiLen)
+trend  = ta.sma(close, smaLen)
+
+plot(trend, "SMA(50) tendencia", color = color.new(color.orange, 0))
+
+// ---- Señales ----
+uptrend   = close > trend
+downtrend = close < trend
+
+buySignal  = uptrend   and ta.crossover(rsiVal, oversold)
+sellSignal = downtrend and ta.crossunder(rsiVal, overbought)
+
+if allowLong and buySignal
+    strategy.entry("Long", strategy.long)
+if allowShort and sellSignal
+    strategy.entry("Short", strategy.short)
+
+plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buySignal,  title = "RSI+SMA BUY",  message = "RSI(14)+SMA(50): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellSignal, title = "RSI+SMA SELL", message = "RSI(14)+SMA(50): señal de VENTA en {{ticker}} {{interval}}")
+
+// RSI visible en la ventana de datos (Data Window) sin ensuciar el gráfico de precio
+plot(rsiVal, "RSI(14)", display = display.data_window)

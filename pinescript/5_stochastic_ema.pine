@@ -1,0 +1,49 @@
+//@version=5
+// Estrategia 5: Estocástico(14,3) + EMA(50) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): Oscilador Estocástico %K/%D y EMA de 50 periodos.
+// Compra: %K cruza al alza a %D en zona de sobreventa (< 20) y el precio
+//         está por encima de la EMA(50).
+// Venta:  %K cruza a la baja a %D en zona de sobrecompra (> 80) y el precio
+//         está por debajo de la EMA(50).
+strategy("Stochastic(14,3) + EMA(50) - 5m Futuros", shorttitle = "Stoch+EMA",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT)
+
+// ---- Inputs ----
+kLen       = input.int(14, "Periodo %K", minval = 1)
+dLen       = input.int(3,  "Periodo %D (suavizado)", minval = 1)
+emaLen     = input.int(50, "EMA (tendencia)", minval = 1)
+oversold   = input.float(20, "Nivel de sobreventa")
+overbought = input.float(80, "Nivel de sobrecompra")
+allowLong  = input.bool(true, "Permitir compras (long)")
+allowShort = input.bool(true, "Permitir ventas en corto (short)")
+
+// ---- Indicadores ----
+k = ta.stoch(close, high, low, kLen)
+d = ta.sma(k, dLen)
+trend = ta.ema(close, emaLen)
+
+plot(trend, "EMA(50) tendencia", color = color.new(color.orange, 0))
+
+// ---- Señales ----
+crossUp   = ta.crossover(k, d)
+crossDown = ta.crossunder(k, d)
+
+buySignal  = crossUp   and k < oversold   and close > trend
+sellSignal = crossDown and k > overbought and close < trend
+
+if allowLong and buySignal
+    strategy.entry("Long", strategy.long)
+if allowShort and sellSignal
+    strategy.entry("Short", strategy.short)
+
+plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buySignal,  title = "Stochastic+EMA BUY",  message = "Stochastic(14,3)+EMA(50): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellSignal, title = "Stochastic+EMA SELL", message = "Stochastic(14,3)+EMA(50): señal de VENTA en {{ticker}} {{interval}}")
+
+plot(k, "%K", display = display.data_window)
+plot(d, "%D", display = display.data_window)
