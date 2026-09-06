@@ -1,50 +1,78 @@
 //@version=5
-// Estrategia 3: Bandas de Bollinger(20,2) + RSI(14) — reversión a la media
-// futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Estrategia 3: Bandas de Bollinger(20,2) + RSI(14) + gestión de riesgo
+// futuros BTC/XRP/XAUT/SOL, timeframe 5m — reversión a la media
 // Indicadores (2): Bandas de Bollinger (20, 2) y RSI (14).
-// Compra: el cierre toca/perfora la banda inferior y el RSI está en
-//         sobreventa (< 30) -> posible rebote alcista.
-// Venta:  el cierre toca/perfora la banda superior y el RSI está en
-//         sobrecompra (> 70) -> posible corrección bajista / short.
-strategy("Bollinger(20,2) + RSI(14) - 5m Futuros", shorttitle = "BB+RSI",
+// Compra: cierre ≤ banda inferior y RSI < 30 (+ filtro de tendencia superior).
+// Venta:  cierre ≥ banda superior y RSI > 70 (+ filtro de tendencia superior).
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("Bollinger(20,2) + RSI(14) + Riesgo - 5m Futuros", shorttitle = "BB+RSI+R",
      overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
-     initial_capital = 1000, currency = currency.USDT)
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
 
-// ---- Inputs ----
-bbLen      = input.int(20, "Periodo Bandas de Bollinger", minval = 1)
-bbStd      = input.float(2.0, "Desviaciones estándar", minval = 0.1)
-rsiLen     = input.int(14, "Periodo RSI", minval = 1)
-oversold   = input.float(30, "Nivel de sobreventa")
-overbought = input.float(70, "Nivel de sobrecompra")
-allowLong  = input.bool(true, "Permitir compras (long)")
-allowShort = input.bool(true, "Permitir ventas en corto (short)")
+// ---- Inputs: indicador ----
+bbLen      = input.int(20, "Periodo Bandas de Bollinger", minval = 1, group = "Indicador")
+bbStd      = input.float(2.0, "Desviaciones estándar", minval = 0.1, group = "Indicador")
+rsiLen     = input.int(14, "Periodo RSI", minval = 1, group = "Indicador")
+oversold   = input.float(30, "Nivel de sobreventa", group = "Indicador")
+overbought = input.float(70, "Nivel de sobrecompra", group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(2.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
 
 // ---- Indicadores ----
-basis = ta.sma(close, bbLen)
-dev   = bbStd * ta.stdev(close, bbLen)
-upper = basis + dev
-lower = basis - dev
+basis  = ta.sma(close, bbLen)
+dev    = bbStd * ta.stdev(close, bbLen)
+upper  = basis + dev
+lower  = basis - dev
 rsiVal = ta.rsi(close, rsiLen)
+atrVal = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
 
 plot(upper, "Banda superior", color = color.new(color.gray, 0))
 plot(basis, "Media (20)",     color = color.new(color.gray, 50))
 plot(lower, "Banda inferior", color = color.new(color.gray, 0))
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
 
-// ---- Señales ----
+// ---- Señales crudas ----
 buySignal  = close <= lower and rsiVal < oversold
 sellSignal = close >= upper and rsiVal > overbought
 
-if allowLong and buySignal
-    strategy.entry("Long", strategy.long)
-if allowShort and sellSignal
-    strategy.entry("Short", strategy.short)
+// ---- Filtro de tendencia superior ----
+// Nota: en reversión a la media suele convenir exigir que el precio NO esté
+// en tendencia fuertemente contraria; aquí se usa el mismo filtro direccional
+// que en las demás estrategias para mantener consistencia y comparabilidad.
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
 
-plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
      style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
-plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
      style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
 
-alertcondition(buySignal,  title = "Bollinger+RSI BUY",  message = "Bollinger(20,2)+RSI(14): señal de COMPRA en {{ticker}} {{interval}}")
-alertcondition(sellSignal, title = "Bollinger+RSI SELL", message = "Bollinger(20,2)+RSI(14): señal de VENTA en {{ticker}} {{interval}}")
+alertcondition(buyEntry,  title = "Bollinger+RSI BUY",  message = "Bollinger(20,2)+RSI(14): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "Bollinger+RSI SELL", message = "Bollinger(20,2)+RSI(14): señal de VENTA en {{ticker}} {{interval}}")
 
 plot(rsiVal, "RSI(14)", display = display.data_window)

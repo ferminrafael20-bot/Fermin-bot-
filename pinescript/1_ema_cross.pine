@@ -1,38 +1,65 @@
 //@version=5
-// Estrategia 1: Cruce de EMAs (9/21) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Estrategia 1: Cruce de EMAs (9/21) + gestión de riesgo — futuros BTC/XRP/XAUT/SOL, 5m
 // Indicadores (2): EMA rápida (9) y EMA lenta (21) sobre el cierre.
-// Compra: la EMA rápida cruza al alza la EMA lenta.
-// Venta:  la EMA rápida cruza a la baja la EMA lenta.
-strategy("EMA Cross (9/21) - 5m Futuros", shorttitle = "EMA9/21",
+// Compra: la EMA rápida cruza al alza la EMA lenta (+ filtro de tendencia superior).
+// Venta:  la EMA rápida cruza a la baja la EMA lenta (+ filtro de tendencia superior).
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("EMA Cross (9/21) + Riesgo - 5m Futuros", shorttitle = "EMA9/21+R",
      overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
-     initial_capital = 1000, currency = currency.USDT)
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
 
-// ---- Inputs ----
-fastLen = input.int(9,  "EMA rápida", minval = 1)
-slowLen = input.int(21, "EMA lenta",  minval = 1)
-allowLong  = input.bool(true, "Permitir compras (long)")
-allowShort = input.bool(true, "Permitir ventas en corto (short)")
+// ---- Inputs: indicador ----
+fastLen = input.int(9,  "EMA rápida", minval = 1, group = "Indicador")
+slowLen = input.int(21, "EMA lenta",  minval = 1, group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(3.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
 
 // ---- Indicadores ----
 emaFast = ta.ema(close, fastLen)
 emaSlow = ta.ema(close, slowLen)
+atrVal  = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
 
 plot(emaFast, "EMA rápida", color = color.new(color.aqua, 0))
 plot(emaSlow, "EMA lenta",  color = color.new(color.orange, 0))
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
 
-// ---- Señales ----
+// ---- Señales crudas ----
 buySignal  = ta.crossover(emaFast, emaSlow)
 sellSignal = ta.crossunder(emaFast, emaSlow)
 
-if allowLong and buySignal
-    strategy.entry("Long", strategy.long)
-if allowShort and sellSignal
-    strategy.entry("Short", strategy.short)
+// ---- Filtro de tendencia superior ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
 
-plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
      style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
-plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
      style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
 
-alertcondition(buySignal,  title = "EMA Cross BUY",  message = "EMA Cross (9/21): señal de COMPRA en {{ticker}} {{interval}}")
-alertcondition(sellSignal, title = "EMA Cross SELL", message = "EMA Cross (9/21): señal de VENTA en {{ticker}} {{interval}}")
+alertcondition(buyEntry,  title = "EMA Cross BUY",  message = "EMA Cross (9/21): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "EMA Cross SELL", message = "EMA Cross (9/21): señal de VENTA en {{ticker}} {{interval}}")

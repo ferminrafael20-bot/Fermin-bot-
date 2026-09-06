@@ -1,49 +1,74 @@
 //@version=5
-// Estrategia 5: Estocástico(14,3) + EMA(50) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Estrategia 5: Estocástico(14,3) + EMA(50) + gestión de riesgo — futuros BTC/XRP/XAUT/SOL, 5m
 // Indicadores (2): Oscilador Estocástico %K/%D y EMA de 50 periodos.
-// Compra: %K cruza al alza a %D en zona de sobreventa (< 20) y el precio
-//         está por encima de la EMA(50).
-// Venta:  %K cruza a la baja a %D en zona de sobrecompra (> 80) y el precio
-//         está por debajo de la EMA(50).
-strategy("Stochastic(14,3) + EMA(50) - 5m Futuros", shorttitle = "Stoch+EMA",
+// Compra: %K cruza al alza %D en sobreventa y precio > EMA(50) (+ filtro superior).
+// Venta:  %K cruza a la baja %D en sobrecompra y precio < EMA(50) (+ filtro superior).
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("Stochastic(14,3) + EMA(50) + Riesgo - 5m Futuros", shorttitle = "Stoch+EMA+R",
      overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
-     initial_capital = 1000, currency = currency.USDT)
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
 
-// ---- Inputs ----
-kLen       = input.int(14, "Periodo %K", minval = 1)
-dLen       = input.int(3,  "Periodo %D (suavizado)", minval = 1)
-emaLen     = input.int(50, "EMA (tendencia)", minval = 1)
-oversold   = input.float(20, "Nivel de sobreventa")
-overbought = input.float(80, "Nivel de sobrecompra")
-allowLong  = input.bool(true, "Permitir compras (long)")
-allowShort = input.bool(true, "Permitir ventas en corto (short)")
+// ---- Inputs: indicador ----
+kLen       = input.int(14, "Periodo %K", minval = 1, group = "Indicador")
+dLen       = input.int(3,  "Periodo %D (suavizado)", minval = 1, group = "Indicador")
+emaLen     = input.int(50, "EMA (tendencia local)", minval = 1, group = "Indicador")
+oversold   = input.float(20, "Nivel de sobreventa", group = "Indicador")
+overbought = input.float(80, "Nivel de sobrecompra", group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(3.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
 
 // ---- Indicadores ----
 k = ta.stoch(close, high, low, kLen)
 d = ta.sma(k, dLen)
 trend = ta.ema(close, emaLen)
+atrVal = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
 
-plot(trend, "EMA(50) tendencia", color = color.new(color.orange, 0))
+plot(trend, "EMA(50) tendencia local", color = color.new(color.orange, 0))
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
 
-// ---- Señales ----
+// ---- Señales crudas ----
 crossUp   = ta.crossover(k, d)
 crossDown = ta.crossunder(k, d)
 
 buySignal  = crossUp   and k < oversold   and close > trend
 sellSignal = crossDown and k > overbought and close < trend
 
-if allowLong and buySignal
-    strategy.entry("Long", strategy.long)
-if allowShort and sellSignal
-    strategy.entry("Short", strategy.short)
+// ---- Filtro de tendencia superior ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
 
-plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
      style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
-plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
      style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
 
-alertcondition(buySignal,  title = "Stochastic+EMA BUY",  message = "Stochastic(14,3)+EMA(50): señal de COMPRA en {{ticker}} {{interval}}")
-alertcondition(sellSignal, title = "Stochastic+EMA SELL", message = "Stochastic(14,3)+EMA(50): señal de VENTA en {{ticker}} {{interval}}")
+alertcondition(buyEntry,  title = "Stochastic+EMA BUY",  message = "Stochastic(14,3)+EMA(50): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "Stochastic+EMA SELL", message = "Stochastic(14,3)+EMA(50): señal de VENTA en {{ticker}} {{interval}}")
 
 plot(k, "%K", display = display.data_window)
 plot(d, "%D", display = display.data_window)

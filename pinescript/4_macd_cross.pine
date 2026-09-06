@@ -1,41 +1,67 @@
 //@version=5
-// Estrategia 4: Cruce de MACD(12,26,9) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
-// Indicadores (2, integrados en el MACD): línea MACD (EMA12-EMA26) y su
-// línea de señal (EMA9 del MACD).
-// Compra: la línea MACD cruza al alza la línea de señal.
-// Venta:  la línea MACD cruza a la baja la línea de señal.
-strategy("MACD Cross (12,26,9) - 5m Futuros", shorttitle = "MACD Cross",
+// Estrategia 4: Cruce de MACD(12,26,9) + gestión de riesgo — futuros BTC/XRP/XAUT/SOL, 5m
+// Indicadores (2, integrados en el MACD): línea MACD y línea de señal.
+// Compra: línea MACD cruza al alza la señal (+ filtro de tendencia superior).
+// Venta:  línea MACD cruza a la baja la señal (+ filtro de tendencia superior).
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("MACD Cross (12,26,9) + Riesgo - 5m Futuros", shorttitle = "MACD+R",
      overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
-     initial_capital = 1000, currency = currency.USDT)
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
 
-// ---- Inputs ----
-fastLen   = input.int(12, "EMA rápida (MACD)", minval = 1)
-slowLen   = input.int(26, "EMA lenta (MACD)",  minval = 1)
-signalLen = input.int(9,  "Periodo de señal",  minval = 1)
-allowLong  = input.bool(true, "Permitir compras (long)")
-allowShort = input.bool(true, "Permitir ventas en corto (short)")
+// ---- Inputs: indicador ----
+fastLen   = input.int(12, "EMA rápida (MACD)", minval = 1, group = "Indicador")
+slowLen   = input.int(26, "EMA lenta (MACD)",  minval = 1, group = "Indicador")
+signalLen = input.int(9,  "Periodo de señal",  minval = 1, group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(3.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
 
 // ---- Indicadores ----
 [macdLine, signalLine, hist] = ta.macd(close, fastLen, slowLen, signalLen)
+atrVal = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
 
-// ---- Señales ----
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
+
+// ---- Señales crudas ----
 buySignal  = ta.crossover(macdLine, signalLine)
 sellSignal = ta.crossunder(macdLine, signalLine)
 
-if allowLong and buySignal
-    strategy.entry("Long", strategy.long)
-if allowShort and sellSignal
-    strategy.entry("Short", strategy.short)
+// ---- Filtro de tendencia superior ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
 
-plotshape(buySignal,  title = "BUY",  text = "BUY",  location = location.belowbar,
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
      style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
-plotshape(sellSignal, title = "SELL", text = "SELL", location = location.abovebar,
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
      style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
 
-alertcondition(buySignal,  title = "MACD Cross BUY",  message = "MACD(12,26,9): señal de COMPRA en {{ticker}} {{interval}}")
-alertcondition(sellSignal, title = "MACD Cross SELL", message = "MACD(12,26,9): señal de VENTA en {{ticker}} {{interval}}")
+alertcondition(buyEntry,  title = "MACD Cross BUY",  message = "MACD(12,26,9): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "MACD Cross SELL", message = "MACD(12,26,9): señal de VENTA en {{ticker}} {{interval}}")
 
-// Línea MACD/señal/histograma visibles en Data Window (sin plotearlas sobre el precio)
-plot(macdLine,   "MACD",     display = display.data_window)
-plot(signalLine, "Señal",    display = display.data_window)
+plot(macdLine,   "MACD",       display = display.data_window)
+plot(signalLine, "Señal",      display = display.data_window)
 plot(hist,       "Histograma", display = display.data_window)
