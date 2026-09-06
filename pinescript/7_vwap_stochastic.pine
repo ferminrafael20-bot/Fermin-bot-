@@ -1,0 +1,84 @@
+//@version=5
+// Estrategia 7: VWAP + bandas de desviación + Estocástico(14,3) — reversión intradía
+// futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): VWAP con bandas de desviación estándar, y Estocástico %K/%D.
+// Compra: cierre ≤ banda inferior del VWAP y %K cruza al alza %D en sobreventa.
+// Venta:  cierre ≥ banda superior del VWAP y %K cruza a la baja %D en sobrecompra.
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("VWAP + Stochastic - 5m Futuros", shorttitle = "VWAP+Stoch",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
+
+// ---- Inputs: indicador ----
+devLen     = input.int(20, "Periodo de desviación del VWAP", minval = 1, group = "Indicador")
+bandMult   = input.float(2.0, "Bandas (x desviación estándar)", minval = 0.1, step = 0.1, group = "Indicador")
+kLen       = input.int(14, "Periodo %K", minval = 1, group = "Indicador")
+dLen       = input.int(3,  "Periodo %D (suavizado)", minval = 1, group = "Indicador")
+oversold   = input.float(20, "Nivel de sobreventa", group = "Indicador")
+overbought = input.float(80, "Nivel de sobrecompra", group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(false, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(2.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
+
+// ---- Indicadores ----
+vwapVal  = ta.vwap(hlc3)
+devStdev = ta.stdev(close - vwapVal, devLen)
+upperBand = vwapVal + bandMult * devStdev
+lowerBand = vwapVal - bandMult * devStdev
+
+k = ta.stoch(close, high, low, kLen)
+d = ta.sma(k, dLen)
+
+atrVal = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
+
+plot(vwapVal,   "VWAP",          color = color.new(color.blue, 0), linewidth = 2)
+plot(upperBand, "Banda superior", color = color.new(color.gray, 0))
+plot(lowerBand, "Banda inferior", color = color.new(color.gray, 0))
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
+
+// ---- Señales crudas ----
+crossUp   = ta.crossover(k, d)
+crossDown = ta.crossunder(k, d)
+
+buySignal  = close <= lowerBand and crossUp   and k < oversold
+sellSignal = close >= upperBand and crossDown and k > overbought
+
+// ---- Filtro de tendencia superior (desactivado por defecto: esta es una
+// estrategia de reversión, no de seguimiento de tendencia) ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
+
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buyEntry,  title = "VWAP+Stoch BUY",  message = "VWAP+Stochastic: señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "VWAP+Stoch SELL", message = "VWAP+Stochastic: señal de VENTA en {{ticker}} {{interval}}")
+
+plot(k, "%K", display = display.data_window)
+plot(d, "%D", display = display.data_window)

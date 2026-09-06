@@ -1,0 +1,73 @@
+//@version=5
+// Estrategia 6: Supertrend(10,3) + ADX(14) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): Supertrend (ATR x factor) y ADX (fuerza de tendencia).
+// Compra: el Supertrend cambia de bajista a alcista y ADX > umbral (tendencia con fuerza).
+// Venta:  el Supertrend cambia de alcista a bajista y ADX > umbral.
+// Riesgo: stop-loss = la propia línea del Supertrend (trailing), take-profit por ATR.
+strategy("Supertrend(10,3) + ADX(14) - 5m Futuros", shorttitle = "ST+ADX",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
+
+// ---- Inputs: indicador ----
+stFactor  = input.float(3.0, "Factor Supertrend", minval = 0.1, step = 0.1, group = "Indicador")
+stAtrLen  = input.int(10, "Periodo ATR del Supertrend", minval = 1, group = "Indicador")
+adxLen    = input.int(14, "Periodo ADX/DMI", minval = 1, group = "Indicador")
+adxTh     = input.float(20, "ADX mínimo (fuerza de tendencia)", minval = 0, group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+tpAtrLen = input.int(14, "Periodo ATR (take profit)", minval = 1, group = "Gestión de riesgo")
+tpMult   = input.float(3.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
+
+// ---- Indicadores ----
+[supertrend, direction] = ta.supertrend(stFactor, stAtrLen)
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxLen)
+tpAtr = ta.atr(tpAtrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
+
+plot(supertrend, "Supertrend", color = direction < 0 ? color.new(color.green, 0) : color.new(color.red, 0), linewidth = 2)
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
+
+// ---- Señales crudas: giro del Supertrend + fuerza de tendencia (ADX) ----
+flipBull = direction < 0 and direction[1] > 0
+flipBear = direction > 0 and direction[1] < 0
+
+buySignal  = flipBull and adxVal > adxTh
+sellSignal = flipBear and adxVal > adxTh
+
+// ---- Filtro de tendencia superior ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
+
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+if sellEntry
+    strategy.entry("Short", strategy.short)
+
+// Trailing stop = la propia línea del Supertrend; take-profit fijo por ATR
+if strategy.position_size > 0
+    strategy.exit("Salida Long", "Long", stop = supertrend, limit = strategy.position_avg_price + tpMult * tpAtr)
+if strategy.position_size < 0
+    strategy.exit("Salida Short", "Short", stop = supertrend, limit = strategy.position_avg_price - tpMult * tpAtr)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buyEntry,  title = "Supertrend+ADX BUY",  message = "Supertrend(10,3)+ADX(14): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "Supertrend+ADX SELL", message = "Supertrend(10,3)+ADX(14): señal de VENTA en {{ticker}} {{interval}}")
+
+plot(adxVal, "ADX", display = display.data_window)

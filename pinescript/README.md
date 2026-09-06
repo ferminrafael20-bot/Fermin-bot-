@@ -1,7 +1,10 @@
-# Pine Script (TradingView) — 5 estrategias con gestión de riesgo
+# Pine Script (TradingView) — 10 estrategias con gestión de riesgo
 
-Versión en Pine Script v5 de las 5 estrategias de `strategies/`, lista para
-usar en el **Pine Editor de TradingView** como `strategy()`. Incluyen:
+Versión en Pine Script v5 de 10 estrategias, listas para usar en el **Pine
+Editor de TradingView** como `strategy()`. Las 5 primeras replican las
+versiones de `strategies/`; las 5 siguientes (6-10) usan lógica más
+moderna (Supertrend, VWAP, Donchian, Heikin Ashi, Parabolic SAR). Todas
+incluyen:
 
 - Backtest con el **Strategy Tester** (datos históricos reales de TradingView,
   sin necesidad de exportar nada).
@@ -20,6 +23,15 @@ usar en el **Pine Editor de TradingView** como `strategy()`. Incluyen:
 | [`3_bollinger_rsi.pine`](3_bollinger_rsi.pine) | Bollinger + RSI | Bandas de Bollinger(20,2), RSI(14) |
 | [`4_macd_cross.pine`](4_macd_cross.pine) | Cruce de MACD | MACD(12,26,9) |
 | [`5_stochastic_ema.pine`](5_stochastic_ema.pine) | Estocástico + EMA | %K/%D(14,3), EMA(50) |
+| [`6_supertrend_adx.pine`](6_supertrend_adx.pine) | Supertrend + ADX | Supertrend(10,3), ADX/DMI(14) |
+| [`7_vwap_stochastic.pine`](7_vwap_stochastic.pine) | VWAP + Estocástico (reversión intradía) | Bandas de VWAP, %K/%D(14,3) |
+| [`8_donchian_volume.pine`](8_donchian_volume.pine) | Ruptura de Donchian + Volumen | Canal de Donchian(20), SMA volumen(20) |
+| [`9_heikinashi_ema.pine`](9_heikinashi_ema.pine) | Heikin Ashi + EMA | Velas Heikin Ashi, EMA(50) |
+| [`10_parabolic_sar_adx.pine`](10_parabolic_sar_adx.pine) | Parabolic SAR + ADX | Parabolic SAR, ADX/DMI(14) |
+
+Las estrategias 6 y 10 usan la propia línea del indicador (Supertrend / SAR)
+como **stop-loss dinámico (trailing)** en vez de un múltiplo fijo de ATR —
+es el uso clásico de esos indicadores como sistema "stop-and-reverse".
 
 ## Cómo usarlas
 

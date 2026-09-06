@@ -1,0 +1,70 @@
+//@version=5
+// Estrategia 9: Heikin Ashi + EMA(50) — futuros BTC/XRP/XAUT/SOL, timeframe 5m
+// Indicadores (2): velas Heikin Ashi (suavizado de tendencia) y EMA de 50 periodos.
+// Compra: la vela Heikin Ashi pasa de bajista a alcista y el precio real está
+//         por encima de la EMA(50) (+ filtro de tendencia superior).
+// Venta:  la vela Heikin Ashi pasa de alcista a bajista y el precio real está
+//         por debajo de la EMA(50) (+ filtro de tendencia superior).
+// Riesgo: stop-loss y take-profit dinámicos basados en ATR.
+strategy("Heikin Ashi + EMA(50) - 5m Futuros", shorttitle = "HA+EMA50",
+     overlay = true, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     initial_capital = 1000, currency = currency.USDT,
+     commission_type = strategy.commission.percent, commission_value = 0.04,
+     slippage = 1, process_orders_on_close = true)
+
+// ---- Inputs: indicador ----
+emaLen = input.int(50, "EMA (tendencia)", minval = 1, group = "Indicador")
+
+// ---- Inputs: filtro de tendencia superior ----
+useHtfFilter = input.bool(true, "Filtrar por tendencia de timeframe superior", group = "Filtro de tendencia")
+htf          = input.timeframe("60", "Timeframe superior", group = "Filtro de tendencia")
+
+// ---- Inputs: gestión de riesgo ----
+atrLen  = input.int(14, "Periodo ATR", minval = 1, group = "Gestión de riesgo")
+slMult  = input.float(1.5, "Stop Loss (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+tpMult  = input.float(3.0, "Take Profit (x ATR)", minval = 0.1, step = 0.1, group = "Gestión de riesgo")
+
+allowLong  = input.bool(true, "Permitir compras (long)",  group = "Dirección")
+allowShort = input.bool(true, "Permitir ventas en corto (short)", group = "Dirección")
+
+// ---- Indicadores ----
+haTicker = ticker.heikinashi(syminfo.tickerid)
+[haOpen, haClose] = request.security(haTicker, timeframe.period, [open, close])
+
+trend  = ta.ema(close, emaLen)
+atrVal = ta.atr(atrLen)
+htfTrend = request.security(syminfo.tickerid, htf, ta.ema(close, 50))
+
+plot(trend, "EMA(50)", color = color.new(color.orange, 0))
+plot(useHtfFilter ? htfTrend : na, "Tendencia superior", color = color.new(color.purple, 0), linewidth = 2)
+
+// ---- Señales crudas: giro de color de la vela Heikin Ashi ----
+haBullish = haClose > haOpen
+haBearish = haClose < haOpen
+
+buySignal  = haBullish and haBearish[1] and close > trend
+sellSignal = haBearish and haBullish[1] and close < trend
+
+// ---- Filtro de tendencia superior ----
+trendOkLong  = not useHtfFilter or close > htfTrend
+trendOkShort = not useHtfFilter or close < htfTrend
+
+// ---- Señales realmente operadas (con filtro) ----
+buyEntry  = buySignal  and allowLong  and trendOkLong
+sellEntry = sellSignal and allowShort and trendOkShort
+
+if buyEntry
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Salida Long", "Long", stop = close - slMult * atrVal, limit = close + tpMult * atrVal)
+
+if sellEntry
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Salida Short", "Short", stop = close + slMult * atrVal, limit = close - tpMult * atrVal)
+
+plotshape(buyEntry,  title = "BUY",  text = "BUY",  location = location.belowbar,
+     style = shape.triangleup,   color = color.new(color.green, 0), textcolor = color.green, size = size.tiny)
+plotshape(sellEntry, title = "SELL", text = "SELL", location = location.abovebar,
+     style = shape.triangledown, color = color.new(color.red, 0),   textcolor = color.red,   size = size.tiny)
+
+alertcondition(buyEntry,  title = "Heikin Ashi+EMA BUY",  message = "Heikin Ashi+EMA(50): señal de COMPRA en {{ticker}} {{interval}}")
+alertcondition(sellEntry, title = "Heikin Ashi+EMA SELL", message = "Heikin Ashi+EMA(50): señal de VENTA en {{ticker}} {{interval}}")
