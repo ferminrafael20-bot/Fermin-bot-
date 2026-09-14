@@ -71,10 +71,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // --- Store products cached from the Mercado Libre scraper ---
+    // --- Store products: the scraper (Admin SDK) creates/refreshes them; an admin can
+    // still hide or delete a bad match by hand from the admin panel. ---
     match /products/{productId} {
       allow read: if isSignedIn();
-      allow write: if false; // only the scraper Cloud Function (Admin SDK) writes here
+      allow write: if isAdmin();
+    }
+
+    // --- Coaches directory (admin panel) ---
+    match /coaches/{coachId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

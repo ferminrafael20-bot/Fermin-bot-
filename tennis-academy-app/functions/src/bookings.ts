@@ -87,20 +87,13 @@ export const moveBooking = onCall<{ bookingId: string; newSlotId: string }>(asyn
   return { ok: true };
 });
 
-export const cancelBooking = onCall<{ bookingId: string }>(async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError('unauthenticated', 'Debes iniciar sesion.');
-
-  const { bookingId } = request.data;
-  if (!bookingId) throw new HttpsError('invalid-argument', 'Falta el id de la reserva.');
-
+async function cancelBookingById(bookingId: string): Promise<void> {
   const bookingRef = db.collection('bookings').doc(bookingId);
 
   await db.runTransaction(async (tx) => {
     const bookingSnap = await tx.get(bookingRef);
     if (!bookingSnap.exists) throw new HttpsError('not-found', 'Reserva no encontrada.');
     const booking = bookingSnap.data() as any;
-    if (booking.userId !== uid) throw new HttpsError('permission-denied', 'Esta reserva no es tuya.');
     if (booking.status === 'cancelled') return;
 
     const slotRef = db.collection('classSlots').doc(booking.slotId);
@@ -108,13 +101,47 @@ export const cancelBooking = onCall<{ bookingId: string }>(async (request) => {
     if (slotSnap.exists) {
       const slot = slotSnap.data() as any;
       const pendingHolds = { ...(slot.pendingHolds || {}) };
-      delete pendingHolds[uid];
-      const bookedBy = (slot.bookedBy || []).filter((id: string) => id !== uid);
+      delete pendingHolds[booking.userId];
+      const bookedBy = (slot.bookedBy || []).filter((id: string) => id !== booking.userId);
       tx.update(slotRef, { pendingHolds, bookedBy, status: 'open' });
     }
     tx.update(bookingRef, { status: 'cancelled' });
   });
+}
 
+export const cancelBooking = onCall<{ bookingId: string }>(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Debes iniciar sesion.');
+
+  const { bookingId } = request.data;
+  if (!bookingId) throw new HttpsError('invalid-argument', 'Falta el id de la reserva.');
+
+  const bookingSnap = await db.collection('bookings').doc(bookingId).get();
+  if (!bookingSnap.exists) throw new HttpsError('not-found', 'Reserva no encontrada.');
+  if ((bookingSnap.data() as any).userId !== uid) {
+    throw new HttpsError('permission-denied', 'Esta reserva no es tuya.');
+  }
+
+  await cancelBookingById(bookingId);
+  return { ok: true };
+});
+
+// Cancelacion desde el panel de administracion: un admin/coach puede cancelar la
+// reserva de cualquier alumno (por ejemplo, si el alumno avisa por telefono).
+export const adminCancelBooking = onCall<{ bookingId: string }>(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Debes iniciar sesion.');
+
+  const callerSnap = await db.collection('users').doc(uid).get();
+  const role = callerSnap.exists ? (callerSnap.data() as any).role : null;
+  if (role !== 'admin' && role !== 'coach') {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede cancelar reservas de otros alumnos.');
+  }
+
+  const { bookingId } = request.data;
+  if (!bookingId) throw new HttpsError('invalid-argument', 'Falta el id de la reserva.');
+
+  await cancelBookingById(bookingId);
   return { ok: true };
 });
 

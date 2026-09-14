@@ -9,6 +9,7 @@ para obtener descuentos, y una tienda con productos traidos desde Mercado Libre.
 ```
 tennis-academy-app/
   mobile/       App Expo (React Native + TypeScript)
+  admin/        Panel de administracion (React + Vite + TypeScript, web)
   functions/    Backend en Firebase Cloud Functions (Node + TypeScript)
   firestore.rules, firestore.indexes.json, firebase.json
 ```
@@ -33,6 +34,7 @@ tennis-academy-app/
 | `payments/{id}` | cada transaccion Webpay (pending/authorized/failed) |
 | `affiliatedBrands/{id}` | marcas afiliadas y su codigo/% de descuento |
 | `products/{id}` | catalogo cacheado desde Mercado Libre |
+| `coaches/{id}` | directorio de profesores (nombre, contacto, especialidad, activo) |
 
 Las reglas de seguridad (`firestore.rules`) impiden que un usuario escriba
 directamente su rol, su suscripcion o el resultado de un pago: todo eso lo
@@ -73,7 +75,33 @@ npx expo start
 ```
 Prueba con Expo Go escaneando el QR, o en un emulador Android/iOS.
 
-### 4. Generar el APK/IPA descargable
+### 4. Panel de administracion (`admin/`)
+App web separada (no se instala en el celular) para el equipo de la academia.
+```bash
+cd tennis-academy-app/admin
+npm install
+cp .env.example .env   # misma config web de Firebase que usaste en mobile/.env
+npm run dev             # abre http://localhost:5173
+```
+Menu lateral colapsable (se puede achicar a solo iconos con el boton ◀/▶):
+- **Clases** → submenu *Clases grupales* (`trainingGroups`) y *Clases particulares* (`classSlots`): crear, editar, cancelar o eliminar, asignando un profesor del directorio.
+- **Profesores** (sin submenu): alta/edicion/baja del directorio de profesores -- nombre, foto, contacto, especialidad (particulares/grupales/ambas) y activo/inactivo.
+- **Tienda**: dispara el scraper de Mercado Libre por termino de busqueda y permite quitar un producto mal traido.
+- **Descuentos exclusivos**: alta/edicion/baja de marcas afiliadas (nombre, codigo, % de descuento).
+- **Reservas**: listado de todas las reservas con alumno, clase y estado; permite cancelar la reserva de cualquier alumno (por ejemplo, si avisa por telefono).
+
+Solo puede entrar una cuenta cuyo documento `users/{uid}` tenga `role: "admin"` o
+`role: "coach"` -- cualquier otra cuenta ve un mensaje de "No autorizado" al
+iniciar sesion.
+
+Para publicarlo (Firebase Hosting, gratis para este tamano de trafico):
+```bash
+npm run build
+cd ..
+firebase deploy --only hosting
+```
+
+### 5. Generar el APK/IPA descargable
 Este proyecto usa [EAS Build](https://docs.expo.dev/build/introduction/), que
 compila en la nube de Expo (no requiere Android Studio/Xcode instalados):
 ```bash
@@ -85,15 +113,14 @@ eas build --platform android --profile production   # genera el APK/AAB
 El comando entrega un link de descarga directa del APK al terminar. Para iOS
 se necesita una cuenta de Apple Developer.
 
-### 5. Datos de ejemplo
-Para probar la app necesitas al menos:
-- Un documento en `users/{tuUid}` con `role: "admin"` (para poder disparar la
-  actualizacion manual de la tienda).
-- Algunos documentos en `classSlots` y `trainingGroups` (los crea el rol coach
-  o admin; se puede hacer a mano desde la consola de Firestore mientras no
-  exista un panel de administracion).
-- Ejecutar una vez la funcion `refreshStoreProducts` (o esperar al job
-  programado diario `refreshStoreProductsScheduled`) para poblar `products`.
+### 6. Primer usuario administrador
+El panel de administracion y la app movil dependen de que exista al menos un
+usuario con `role: "admin"`. Para crear el primero:
+1. Registrate normalmente desde la app movil (queda con `role: "student"`).
+2. Desde la consola de Firestore, edita ese documento en `users/{tuUid}` y
+   cambia `role` a `"admin"`.
+3. Ya puedes entrar con ese mismo correo al panel de administracion (`admin/`)
+   y crear ahi a los profesores, clases, grupos, marcas afiliadas, etc.
 
 ## Notas importantes
 
@@ -115,7 +142,8 @@ Para probar la app necesitas al menos:
   queda retenido por 15 minutos mientras se completa el pago (`pendingHolds` /
   `pendingMemberIds`). Un job programado (`releaseExpiredHolds`) libera esos
   cupos si el usuario abandona el pago sin completarlo.
-- No hay todavia un panel de administracion (crear clases, grupos, marcas
-  afiliadas); por ahora esos documentos se gestionan manualmente desde la
-  consola de Firestore. Es el siguiente paso natural si se sigue construyendo
-  el proyecto.
+- Los planes de suscripcion (Basico/Plus/Pro, precio y % de descuento) estan
+  definidos en `functions/src/subscriptions.ts` y en
+  `mobile/src/screens/subscription/SubscriptionScreen.tsx`, no en Firestore.
+  Si se quiere editarlos desde el panel de administracion sin redeployar
+  codigo, ese es el siguiente paso natural.

@@ -6,6 +6,8 @@ functions/.env
 mobile/.expo/
 mobile/dist/
 mobile/.env
+admin/dist/
+admin/.env
 *.log
 firebase-debug.log
 .firebase/
