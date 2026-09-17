@@ -42,13 +42,19 @@ escribe el backend con el Admin SDK despues de validar la logica de negocio.
 
 ## Puesta en marcha
 
-### 1. Crear el proyecto Firebase
-1. Crea un proyecto en https://console.firebase.google.com
-2. Habilita **Authentication** (metodo Correo/Contrasena), **Firestore** y
-   **Functions** (plan Blaze, requerido para llamar APIs externas como Webpay
-   y Mercado Libre desde una Cloud Function).
-3. Instala Firebase CLI (`npm install -g firebase-tools`) y corre
-   `firebase login` + `firebase use --add` dentro de `tennis-academy-app/`.
+### 1. Proyecto Firebase
+El proyecto ya existe: **`rd-tennis-academy`** (fijado en `.firebaserc`, y sus
+claves web ya estan en `mobile/.env.example` / `admin/.env.example`). Si todavia
+no hiciste estos pasos en la consola (https://console.firebase.google.com),
+hacelos antes de desplegar:
+1. **Authentication** → Sign-in method → habilita **Correo/Contrasena**.
+2. **Firestore Database** → Crear base de datos → modo produccion → region
+   **southamerica-east1** (ya no se puede cambiar si la creaste en otra region).
+3. Plan **Blaze** (pago por uso) → requerido para desplegar las Cloud Functions.
+
+Despues, en tu computadora: `npm install -g firebase-tools`, `firebase login`,
+y dentro de `tennis-academy-app/` corre `firebase use rd-tennis-academy` (con
+`.firebaserc` ya deberia seleccionarse solo).
 
 ### 2. Backend (`functions/`)
 ```bash

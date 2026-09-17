@@ -16,7 +16,6 @@
     },
     "plugins": [],
     "extra": {
-      "firebaseApiKey": "REEMPLAZAR_EN_.env",
       "eas": {
         "projectId": "REEMPLAZAR_CON_TU_EAS_PROJECT_ID"
       }
