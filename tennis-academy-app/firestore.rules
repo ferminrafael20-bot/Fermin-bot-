@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isCoach() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['coach', 'admin'];
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      // Clients can update their own profile fields, but never their own role.
+      allow update: if isOwner(userId) &&
+        request.resource.data.role == resource.data.role || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- Class slots (individual classes coaches open for booking) ---
+    match /classSlots/{slotId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCoach();
+    }
+
+    // --- Bookings (a user's reservation of a class slot) ---
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isCoach());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Moving/cancelling your own booking is allowed; payment/status fields are
+      // only ever written by Cloud Functions using the Admin SDK (which bypasses rules).
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId;
+      allow delete: if isAdmin();
+    }
+
+    // --- Training groups ---
+    match /trainingGroups/{groupId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isCoach();
+    }
+
+    // --- Subscriptions & payments are only ever written by Cloud Functions ---
+    match /subscriptions/{subId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // --- Affiliated brands / discounts (public catalog) ---
+    match /affiliatedBrands/{brandId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Store products: the scraper (Admin SDK) creates/refreshes them; an admin can
+    // still hide or delete a bad match by hand from the admin panel. ---
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Coaches directory (admin panel) ---
+    match /coaches/{coachId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
