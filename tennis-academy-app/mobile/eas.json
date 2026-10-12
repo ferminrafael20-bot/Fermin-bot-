@@ -6,12 +6,14 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "node": "22.22.2",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "distribution": "internal",
+      "node": "22.22.2",
       "android": {
         "buildType": "apk"
       }
