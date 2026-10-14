@@ -57,3 +57,14 @@ export const refreshStoreProducts = httpsCallable<{ query: string }, { added: nu
   functions,
   'refreshStoreProducts'
 );
+
+// --- Paquetes de clases ---
+export const purchaseClassPackage = httpsCallable<
+  { packageId: string },
+  WebpayTransactionResponse
+>(functions, 'purchaseClassPackage');
+
+export const scheduleClassFromPackage = httpsCallable<
+  { userPackageId: string; slotId: string },
+  { bookingId: string }
+>(functions, 'scheduleClassFromPackage');

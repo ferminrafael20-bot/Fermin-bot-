@@ -81,3 +81,13 @@ export interface Product {
   category: string;
   lastScrapedAt: number;
 }
+
+export interface ClassPackage {
+  id: string;
+  name: string;
+  classCount: number;
+  price: number;
+  validityDays: number;
+  description?: string;
+  active: boolean;
+}

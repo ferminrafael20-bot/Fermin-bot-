@@ -62,6 +62,9 @@ export default function ClassesListScreen({ navigation }: Props) {
       <TouchableOpacity style={styles.myBookingsButton} onPress={() => navigation.navigate('MyBookings')}>
         <Text style={styles.myBookingsText}>Ver mis clases reservadas</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.packagesButton} onPress={() => navigation.navigate('Packages')}>
+        <Text style={styles.packagesText}>Comprar paquete de clases</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={slots}
@@ -100,6 +103,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   myBookingsButton: { padding: 14, backgroundColor: '#e8f5e9' },
   myBookingsText: { textAlign: 'center', color: '#1b5e20', fontWeight: '600' },
+  packagesButton: { padding: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  packagesText: { textAlign: 'center', color: '#1b5e20', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#777', marginTop: 40 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, elevation: 2 },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 4 },

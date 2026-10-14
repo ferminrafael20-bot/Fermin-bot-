@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import ClasesGrupalesPage from '@/pages/ClasesGrupalesPage';
 import ClasesParticularesPage from '@/pages/ClasesParticularesPage';
+import PaquetesPage from '@/pages/PaquetesPage';
 import ProfesoresPage from '@/pages/ProfesoresPage';
 import TiendaPage from '@/pages/TiendaPage';
 import DescuentosPage from '@/pages/DescuentosPage';
@@ -27,6 +28,7 @@ export default function App() {
           <Route index element={<Navigate to="/clases/grupales" replace />} />
           <Route path="clases/grupales" element={<ClasesGrupalesPage />} />
           <Route path="clases/particulares" element={<ClasesParticularesPage />} />
+          <Route path="clases/paquetes" element={<PaquetesPage />} />
           <Route path="profesores" element={<ProfesoresPage />} />
           <Route path="tienda" element={<TiendaPage />} />
           <Route path="descuentos" element={<DescuentosPage />} />

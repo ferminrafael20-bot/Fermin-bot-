@@ -3,9 +3,10 @@ import { logger } from 'firebase-functions';
 import { db } from './firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { activateSubscription } from './subscriptions';
+import { activateClassPackage } from './classPackages';
 import { getWebpayTransaction, getWebpayReturnUrl } from './transbank';
 
-type Purpose = 'class' | 'group' | 'store' | 'subscription';
+type Purpose = 'class' | 'group' | 'store' | 'subscription' | 'classPackage';
 
 // Calcula el monto real a cobrar en el servidor -- nunca se confia en un monto
 // enviado por el cliente, para evitar que alguien pague menos de lo debido.
@@ -32,6 +33,11 @@ async function resolveAmount(
     const productSnap = await db.collection('products').doc(purposeId).get();
     if (!productSnap.exists) throw new HttpsError('not-found', 'Producto no encontrado.');
     return Math.round((productSnap.data() as any).price);
+  }
+  if (purpose === 'classPackage') {
+    const packageSnap = await db.collection('classPackages').doc(purposeId).get();
+    if (!packageSnap.exists) throw new HttpsError('not-found', 'Paquete no encontrado.');
+    return (packageSnap.data() as any).price;
   }
   throw new HttpsError('invalid-argument', 'Proposito de pago invalido.');
 }
@@ -95,7 +101,13 @@ export const confirmWebpayTransaction = onCall<{ token: string }>(async (request
     confirmedAt: FieldValue.serverTimestamp(),
   });
 
-  await applyPaymentOutcome(payment.purpose, payment.purposeId, uid, commitStatus === 'AUTHORIZED');
+  await applyPaymentOutcome(
+    payment.purpose,
+    payment.purposeId,
+    uid,
+    commitStatus === 'AUTHORIZED',
+    paymentDoc.id
+  );
 
   return { status: commitStatus, purpose: payment.purpose, purposeId: payment.purposeId };
 });
@@ -104,7 +116,8 @@ async function applyPaymentOutcome(
   purpose: Purpose,
   purposeId: string,
   uid: string,
-  authorized: boolean
+  authorized: boolean,
+  paymentId: string
 ) {
   if (purpose === 'class') {
     const bookingRef = db.collection('bookings').doc(purposeId);
@@ -152,6 +165,8 @@ async function applyPaymentOutcome(
     logger.info(`Pago de tienda ${authorized ? 'autorizado' : 'fallido'} para producto ${purposeId} de ${uid}`);
   } else if (purpose === 'subscription' && authorized) {
     await activateSubscription(uid, purposeId as 'basic' | 'plus' | 'pro');
+  } else if (purpose === 'classPackage' && authorized) {
+    await activateClassPackage(uid, purposeId, paymentId);
   }
 }
 

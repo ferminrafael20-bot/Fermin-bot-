@@ -35,6 +35,8 @@ tennis-academy-app/
 | `affiliatedBrands/{id}` | marcas afiliadas y su codigo/% de descuento |
 | `products/{id}` | catalogo cacheado desde Mercado Libre |
 | `coaches/{id}` | directorio de profesores (nombre, contacto, especialidad, activo) |
+| `classPackages/{id}` | catalogo de paquetes de clases comprables (cantidad de clases, precio, vigencia) |
+| `userPackages/{id}` | paquete ya comprado por un alumno (creditos usados/restantes, vencimiento) |
 
 Las reglas de seguridad (`firestore.rules`) impiden que un usuario escriba
 directamente su rol, su suscripcion o el resultado de un pago: todo eso lo
@@ -90,7 +92,7 @@ cp .env.example .env   # misma config web de Firebase que usaste en mobile/.env
 npm run dev             # abre http://localhost:5173
 ```
 Menu lateral colapsable (se puede achicar a solo iconos con el boton ◀/▶):
-- **Clases** → submenu *Clases grupales* (`trainingGroups`) y *Clases particulares* (`classSlots`): crear, editar, cancelar o eliminar, asignando un profesor del directorio.
+- **Clases** → submenu *Clases grupales* (`trainingGroups`), *Clases particulares* (`classSlots`) y *Paquetes de clases* (`classPackages`): crear, editar, cancelar o eliminar clases/grupos asignando un profesor del directorio, y administrar el catalogo de paquetes (cantidad de clases, precio, dias de validez) que los alumnos compran desde la app y despues van agendando -- eligiendo dia y horario entre las clases particulares abiertas -- hasta gastar sus creditos.
 - **Profesores** (sin submenu): alta/edicion/baja del directorio de profesores -- nombre, foto, contacto, especialidad (particulares/grupales/ambas) y activo/inactivo.
 - **Tienda**: dispara el scraper de Mercado Libre por termino de busqueda y permite quitar un producto mal traido.
 - **Descuentos exclusivos**: alta/edicion/baja de marcas afiliadas (nombre, codigo, % de descuento).

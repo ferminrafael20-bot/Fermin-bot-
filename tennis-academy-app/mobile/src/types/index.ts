@@ -36,6 +36,7 @@ export interface Booking {
   slotId: string;
   status: BookingStatus;
   paymentId?: string;
+  packageId?: string; // si se agendo usando un credito de un paquete de clases
   createdAt: number;
 }
 
@@ -82,10 +83,37 @@ export interface Product {
   lastScrapedAt: number;
 }
 
-export type PaymentPurpose = 'class' | 'subscription' | 'group' | 'store';
+export type PaymentPurpose = 'class' | 'subscription' | 'group' | 'store' | 'classPackage';
 
 export interface WebpayTransactionResponse {
   token: string;
   url: string;
+  paymentId: string;
+}
+
+// --- Paquetes de clases (se compran una vez y se van agendando clase por clase) ---
+export interface ClassPackage {
+  id: string;
+  name: string;
+  classCount: number;
+  price: number;
+  validityDays: number;
+  description?: string;
+  active: boolean;
+}
+
+export type UserPackageStatus = 'active' | 'completed' | 'expired';
+
+export interface UserPackage {
+  id: string;
+  userId: string;
+  packageId: string;
+  packageName: string;
+  totalClasses: number;
+  usedClasses: number;
+  remainingClasses: number;
+  purchasedAt: number;
+  expiresAt: number;
+  status: UserPackageStatus;
   paymentId: string;
 }

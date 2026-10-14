@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Clases grupales', path: '/clases/grupales' },
       { label: 'Clases particulares', path: '/clases/particulares' },
+      { label: 'Paquetes de clases', path: '/clases/paquetes' },
     ],
   },
   { label: 'Profesores', path: '/profesores' },

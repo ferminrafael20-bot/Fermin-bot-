@@ -7,5 +7,6 @@ setGlobalOptions({ region: 'southamerica-east1' });
 export { bookClass, moveBooking, cancelBooking, adminCancelBooking, releaseExpiredHolds } from './bookings';
 export { joinTrainingGroup, leaveTrainingGroup } from './groups';
 export { startSubscription, cancelSubscription } from './subscriptions';
+export { purchaseClassPackage, scheduleClassFromPackage } from './classPackages';
 export { createWebpayTransaction, confirmWebpayTransaction, webpayReturn } from './webpay';
 export { refreshStoreProducts, refreshStoreProductsScheduled } from './scraper';

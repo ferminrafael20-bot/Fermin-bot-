@@ -83,5 +83,18 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    // --- Class packages (purchasable catalog, admin-managed) ---
+    match /classPackages/{packageId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- A user's purchased class package (credits to schedule classes with).
+    // Only ever written by Cloud Functions using the Admin SDK. ---
+    match /userPackages/{userPackageId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
   }
 }
