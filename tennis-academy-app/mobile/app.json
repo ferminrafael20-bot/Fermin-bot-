@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Academia de Tenis",
+    "slug": "academia-tenis-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "academiatenis",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.academiatenis.app"
+    },
+    "android": {
+      "package": "com.academiatenis.app"
+    },
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "REEMPLAZAR_CON_TU_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
