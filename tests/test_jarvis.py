@@ -1,0 +1,111 @@
+from datetime import datetime
+
+import pytest
+from openpyxl import load_workbook
+
+from jarvis import Jarvis, command
+from jarvis.core import normalize
+from jarvis.expenses import ExpenseBook, categorize, parse_expense, parse_number
+
+
+class Clock:
+    def __init__(self, dt):
+        self.dt = dt
+
+    def __call__(self):
+        return self.dt
+
+
+@pytest.fixture
+def jarvis(tmp_path):
+    clock = Clock(datetime(2026, 10, 15, 10, 30))
+    j = Jarvis(data_dir=tmp_path, clock=clock)
+    j.clock = clock
+    return j
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("25", 25), ("25.50", 25.5), ("25,5", 25.5), ("1.200", 1200),
+    ("1,200", 1200), ("1.200,50", 1200.5), ("1,200.50", 1200.5), ("1.000.000", 1_000_000),
+])
+def test_parse_number(raw, expected):
+    assert parse_number(raw) == pytest.approx(expected)
+
+
+def test_parse_expense_and_category():
+    assert parse_expense("25.50 en el super") == (25.5, "super")
+    assert parse_expense("2 mil en ropa") == (2000, "ropa")
+    assert parse_expense("$300 pesos de uber") == (300, "uber")
+    assert parse_expense("nada") is None
+    assert categorize("super") == "Comida"
+    assert categorize("gasolina del carro") == "Transporte"
+    assert categorize("algo raro") == "Otros"
+
+
+def test_normalize():
+    assert normalize("Oye Jarvis, ¿Cuánto llevo gastado?") == "cuanto llevo gastado"
+
+
+def test_register_and_summary(jarvis, tmp_path):
+    assert "Comida" in jarvis.handle("gasté 25.50 en el súper")
+    assert "Hogar" in jarvis.handle("Jarvis, pagué 1.200 de renta")
+    assert "Ocio" in jarvis.handle("compré 40 de regalo categoría ocio")
+    resumen = jarvis.handle("¿cuánto llevo gastado este mes?")
+    assert "$1,265.50" in resumen and "3 gastos" in resumen
+
+    ws = load_workbook(tmp_path / "gastos.xlsx")["Gastos"]
+    assert ws.max_row == 4
+    assert ws["C2"].value == 25.5 and ws["D3"].value == "Hogar"
+
+    assert "regalo" in jarvis.handle("borra el último gasto")
+    assert "2 gastos" in jarvis.handle("resumen de gastos")
+
+
+def test_monthly_report(jarvis, tmp_path):
+    jarvis.handle("gasté 100 en gasolina")
+    jarvis.handle("gasté 50 en farmacia")
+    out = jarvis.handle("reporte del mes")
+    path = tmp_path / "reportes" / "reporte_2026-10.xlsx"
+    assert str(path) in out and path.exists()
+    wb = load_workbook(path)
+    assert wb.sheetnames == ["Resumen", "Por día", "Detalle"]
+    assert wb["Resumen"]["B3"].value == 150
+    assert "No hay gastos" in jarvis.handle("reporte de marzo")
+
+
+def test_auto_report_on_new_month(jarvis, tmp_path):
+    jarvis.handle("gasté 100 en cine")
+    assert jarvis.startup() == []  # el mes aún no termina
+    jarvis.clock.dt = datetime(2026, 11, 1, 9, 0)
+    msgs = jarvis.startup()
+    assert len(msgs) == 1 and "octubre" in msgs[0]
+    assert (tmp_path / "reportes" / "reporte_2026-10.xlsx").exists()
+    assert jarvis.startup() == []  # no lo repite
+    assert "$100.00" in jarvis.handle("cuanto gaste el mes pasado")
+
+
+def test_trading_signal_offline(jarvis):
+    out = jarvis.handle("señal de btc con datos de prueba")
+    assert out.startswith("BTC/USDT") and "datos de prueba" in out
+
+
+def test_new_command_plugin(jarvis):
+    @command("eco", r"^repite (.+)$", help="Repite lo que dices.")
+    def eco(ctx, match, texto):
+        return match.group(1)
+
+    assert jarvis.handle("repite hola mundo") == "hola mundo"
+    assert "eco" in jarvis.handle("ayuda")
+
+
+def test_unknown_and_exit(jarvis):
+    assert "No entendí" in jarvis.handle("baila salsa")
+    jarvis.handle("adiós")
+    assert jarvis.should_exit
+
+
+def test_book_month_filter(tmp_path):
+    book = ExpenseBook(tmp_path)
+    book.add(10, "cafe", when=datetime(2026, 9, 30))
+    book.add(20, "cafe", when=datetime(2026, 10, 1))
+    assert [e.monto for e in book.month(2026, 10)] == [20]

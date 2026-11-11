@@ -43,7 +43,8 @@ strategies/
   strategy_5_stochastic_ema.py
 data.py                         # descarga OHLCV vía ccxt + datos sintéticos de prueba
 main.py                         # demo: aplica las 5 estrategias a los 4 símbolos
-tests/                          # pruebas unitarias con pytest
+tests/                          # pruebas unitarias con pytest (incluye Jarvis)
+jarvis/                         # asistente personal (ver sección Jarvis)
 pinescript/                     # las mismas 5 estrategias en Pine Script v5 (TradingView)
 ```
 
@@ -81,4 +82,82 @@ signals = strategy.generate_signals(df)   # serie completa de señales
 
 ```bash
 pytest tests/ -v
+```
+
+---
+
+# 🤖 Jarvis — asistente personal
+
+Prototipo de asistente tipo Jarvis, en español, pensado para **ir agregándole
+comandos**. Funciona por texto o por voz.
+
+```bash
+python -m jarvis                         # modo texto
+python -m jarvis --voz                   # modo voz (micrófono + altavoz)
+python -m jarvis -c "gasté 20 en café"   # un solo comando
+```
+
+## Lo que sabe hacer
+
+| Comando | Ejemplos |
+|---|---|
+| Registrar gasto | "gasté 25.50 en el súper", "pagué 1.200 de renta", "anota gasto de 300 en uber", "gasté 2 mil en ropa", "compré 40 de regalo categoría ocio" |
+| Resumen | "¿cuánto llevo gastado este mes?", "¿en qué estoy gastando?", "¿cuánto gasté en octubre?" |
+| Reporte mensual (Excel) | "reporte del mes", "reporte del mes pasado", "reporte de octubre" |
+| Últimos gastos / corregir | "mis últimos gastos", "borra el último gasto" |
+| Señales de trading | "señal de btc", "qué dice la estrategia macd en sol", "señal de oro con datos de prueba" |
+| Generales | "ayuda", "¿qué hora es?", "¿qué día es hoy?", "adiós" |
+
+**Gastos:** se guardan en `datos_jarvis/gastos.xlsx` (puedes abrirlo con Excel)
+y se clasifican solos por palabras clave (Comida, Transporte, Hogar,
+Servicios, Salud, Ocio, Compras, Educación, Finanzas, Otros). Las palabras
+clave están en `CATEGORIAS` dentro de `jarvis/expenses.py`.
+
+**Reporte de fin de mes:** al arrancar el primer día de un mes nuevo,
+Jarvis crea solo `datos_jarvis/reportes/reporte_AAAA-MM.xlsx` del mes que
+terminó, con una hoja de resumen y gráfico de torta por categoría, una de
+gasto diario con gráfico de barras y una con el detalle. Si quieres que se
+genere aunque no abras Jarvis, prográmalo el día 1 de cada mes:
+
+```bash
+# cron (Linux/macOS): día 1 a las 8:00
+0 8 1 * * cd /ruta/Fermin-bot- && python -m jarvis -c "reporte del mes pasado"
+```
+
+**Voz:** `pip install SpeechRecognition pyttsx3 pyaudio`. El reconocimiento
+de voz usa Google (requiere internet) y la respuesta hablada funciona offline.
+
+## Cómo agregar un comando nuevo
+
+1. Copia `jarvis/commands/_plantilla.py` a `jarvis/commands/mi_comando.py`.
+   Cualquier archivo de esa carpeta se carga solo; los que empiezan por `_`
+   se ignoran.
+2. Define la función con `@command`:
+
+```python
+from jarvis.core import command
+
+@command("recordatorio", r"^recuerdame (.+)$",
+         help="Guarda un recordatorio.", examples=["recuérdame pagar la luz"])
+def recordatorio(ctx, match, texto):
+    (ctx.data_dir / "recordatorios.txt").open("a").write(match.group(1) + "\n")
+    return f"Listo, te recordaré: {match.group(1)}"
+```
+
+Los patrones se comparan con el texto **en minúsculas y sin tildes** (escribe
+"recuerdame", no "recuérdame"), y la palabra "Jarvis" al inicio se quita
+sola. Si necesitas algo al arrancar (como el reporte automático), usa el
+decorador `@on_startup`.
+
+```
+jarvis/
+  core.py           # registro de comandos, normalización y despacho
+  expenses.py       # Excel de gastos, categorías y reportes
+  voice.py          # micrófono y voz (opcional)
+  __main__.py       # interfaz de texto/voz
+  commands/
+    general.py      # ayuda, hora, fecha, saludo, salir
+    gastos.py       # gastos y reportes
+    trading.py      # señales de las 5 estrategias
+    _plantilla.py   # plantilla para comandos nuevos
 ```
