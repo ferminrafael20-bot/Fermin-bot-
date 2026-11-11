@@ -91,13 +91,46 @@ pytest tests/ -v
 Asistente personal en español (estilo Jarvis), por texto, voz o Telegram,
 conectado con Claude y pensado para **ir agregándole funciones**.
 
+## Instalación
+
+Necesitas **Python 3.11 o superior** (python.org). En Windows, al instalarlo
+marca la casilla *"Add python.exe to PATH"*.
+
+| | Windows | Mac |
+|---|---|---|
+| Instalar | doble clic en `instalar_windows.bat` | doble clic en `instalar_mac.command` (si lo bloquea: clic derecho → Abrir) |
+| Hablar con Alfred | doble clic en `Alfred.bat` | doble clic en `Alfred.command` |
+| Con voz | `Alfred.bat --voz` | `./Alfred.command --voz` (la voz necesita [Homebrew](https://brew.sh)) |
+| Claves | abre `.env` con el Bloc de notas | `open -e .env` |
+
+El instalador crea un entorno propio (`.venv`), instala todo, crea tu `.env`
+y te pregunta si quieres que Alfred **arranque solo** al encender el
+computador, que es lo que hace funcionar los recordatorios, los avisos de
+clases, las noticias de las 6:00 y Telegram.
+
+### Si usas Windows y Mac a la vez
+
+- **Los mismos datos en los dos:** en el `.env` de cada computador pon
+  `ALFRED_DATA_DIR` apuntando a una carpeta sincronizada (Google Drive,
+  iCloud, OneDrive o Dropbox). Así tus gastos, agenda, notas y perfil son los
+  mismos en ambos.
+- **El arranque automático, solo en uno:** el que pase más tiempo encendido.
+  Si lo activas en los dos, recibirías las noticias dos veces y el bot de
+  Telegram no puede atender a dos Alfred a la vez. En el otro computador usa
+  Alfred normalmente, sin `--servicio`.
+- **Cierra `gastos.xlsx` en Excel** antes de anotar gastos: en Windows un
+  archivo abierto en Excel no se puede modificar (Alfred te avisa si pasa).
+
+Comandos manuales (con el entorno activado):
+
 ```bash
-pip install -r requirements.txt
-cp .env.ejemplo .env          # y rellena tus claves (ver guías abajo)
 python -m alfred              # modo texto
 python -m alfred --voz        # modo voz
-python -m alfred --servicio   # en segundo plano: avisos, noticias de las 6:00 y Telegram
+python -m alfred --servicio   # en segundo plano: avisos, noticias y Telegram
 ```
+
+**Moneda:** viene en pesos chilenos (`$15.990`) y entiende "lucas" y "palos"
+("gasté 5 lucas en bencina"). Para otra moneda: `ALFRED_MONEDA=USD` en el `.env`.
 
 ## Funciones
 
@@ -153,17 +186,13 @@ llegan por ahí.
 **Aviso de clases y torneos** — `ALFRED_HORA_AVISO=10:00` (hora a la que te
 avisa de lo que tienes mañana).
 
-## Dejarlo siempre encendido
+## Arranque automático
 
-Los recordatorios, avisos y noticias necesitan que Alfred esté corriendo:
-
-- **Windows**: crea un acceso directo con
-  `pythonw -m alfred --servicio` (con "Iniciar en" la carpeta del proyecto) y
-  ponlo en la carpeta de inicio (`Win+R` → `shell:startup`).
-- **Mac/Linux**: agrega a cron `@reboot cd /ruta/Fermin-bot- && python3 -m alfred --servicio`.
-
-Si el PC estaba apagado a las 6:00, las noticias se envían al encenderlo
-(hasta las 12:00).
+Lo configura el instalador. El registro de lo que hace queda en
+`datos_alfred/alfred.log`. Para quitarlo: en Windows borra `Alfred.vbs` de la
+carpeta de inicio (`Win+R` → `shell:startup`); en Mac abre
+`desinstalar_inicio_automatico.command`. Si el computador estaba apagado a
+las 6:00, las noticias se envían al encenderlo (hasta las 12:00).
 
 ## Cómo agregar funciones nuevas
 

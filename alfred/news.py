@@ -8,8 +8,9 @@ from .agenda import fecha_humana
 
 PROMPT = """Hoy es {fecha}. Busca en la web las noticias más relevantes de las últimas 24 horas \
 para un inversor y trader en tres áreas: criptomonedas (en especial BTC, SOL, XRP), forex \
-(dólar, euro, oro/XAU) y bolsa de valores (índices de EE. UU., grandes tecnológicas, datos \
-macro y decisiones de bancos centrales).
+(dólar, euro, oro/XAU y en especial el dólar en Chile, USD/CLP, junto con el cobre) y bolsa de valores (índices de EE. UU., grandes tecnológicas, datos \
+macro y decisiones de bancos centrales, incluido el Banco Central de Chile y el IPSA cuando \
+haya novedades).
 
 Escribe un correo en español, en texto plano (sin markdown), con este formato:
 

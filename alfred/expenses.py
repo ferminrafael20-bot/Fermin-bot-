@@ -7,6 +7,7 @@ crean como ``<data_dir>/reportes/reporte_AAAA-MM.xlsx``.
 
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -24,26 +25,26 @@ HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
 
 # Palabras clave -> categoría. Amplía esta lista a tu gusto (sin tildes).
 CATEGORIAS: dict[str, list[str]] = {
-    "Comida": ["comida", "super", "supermercado", "mercado", "restaurante", "almuerzo",
+    "Comida": ["jumbo", "lider", "unimarc", "santa isabel", "tottus", "acuenta", "completo", "empanada", "sushi", "colacion", "minimarket", "botilleria", "pedidosya", "justo", "cornershop", "comida", "super", "supermercado", "mercado", "restaurante", "almuerzo",
                "cena", "desayuno", "cafe", "pizza", "hamburguesa", "tacos", "pan",
                "panaderia", "frutas", "verduras", "carniceria", "delivery", "rappi",
                "uber eats", "pedidos ya", "snack", "bebida"],
-    "Transporte": ["gasolina", "nafta", "combustible", "uber", "taxi", "didi", "cabify",
+    "Transporte": ["bencina", "copec", "shell", "petrobras", "aramco", "micro", "colectivo", "bip", "tag", "autopista", "red movilidad", "efe", "turbus", "pullman", "permiso de circulacion", "revision tecnica", "soap", "gasolina", "nafta", "combustible", "uber", "taxi", "didi", "cabify",
                    "bus", "autobus", "metro", "pasaje", "peaje", "estacionamiento",
                    "parqueo", "parking", "mecanico", "carro", "auto", "moto"],
-    "Hogar": ["renta", "alquiler", "arriendo", "hipoteca", "muebles", "limpieza",
+    "Hogar": ["gastos comunes", "contribuciones", "sodimac", "easy", "homecenter", "lavanderia", "renta", "alquiler", "arriendo", "hipoteca", "muebles", "limpieza",
               "ferreteria", "casa"],
-    "Servicios": ["luz", "agua", "gas", "internet", "telefono", "celular", "cable",
+    "Servicios": ["enel", "cge", "aguas andinas", "esval", "metrogas", "lipigas", "abastible", "gasco", "entel", "movistar", "wom", "claro", "vtr", "mundo", "gtd", "icloud", "google one", "chatgpt", "claude", "youtube premium", "luz", "agua", "gas", "internet", "telefono", "celular", "cable",
                   "netflix", "spotify", "suscripcion", "electricidad", "plan"],
-    "Salud": ["farmacia", "medicina", "medicamento", "doctor", "medico", "dentista",
+    "Salud": ["isapre", "fonasa", "cruz verde", "salcobrand", "ahumada", "dr simi", "clinica", "examen", "kine", "kinesiologo", "psicologo", "optica", "lentes", "farmacia", "medicina", "medicamento", "doctor", "medico", "dentista",
               "hospital", "consulta", "seguro medico", "gimnasio", "gym"],
-    "Ocio": ["cine", "fiesta", "bar", "cerveza", "trago", "concierto", "juego",
+    "Ocio": ["copete", "carrete", "piscola", "entrada", "estadio", "pádel", "padel", "cancha", "easycancha", "torneo", "cine", "fiesta", "bar", "cerveza", "trago", "concierto", "juego",
              "videojuego", "viaje", "hotel", "salida", "paseo"],
-    "Compras": ["ropa", "zapatos", "tenis", "amazon", "regalo", "tienda", "shopping",
+    "Compras": ["falabella", "paris", "ripley", "mercado libre", "aliexpress", "temu", "shein", "hites", "la polar", "ropa", "zapatos", "tenis", "amazon", "regalo", "tienda", "shopping",
                 "electronica", "accesorio"],
-    "Educación": ["curso", "libro", "colegio", "escuela", "universidad", "matricula",
+    "Educación": ["colegiatura", "arancel", "preu", "udemy", "platzi", "coursera", "curso", "libro", "colegio", "escuela", "universidad", "matricula",
                   "clase", "utiles"],
-    "Finanzas": ["tarjeta", "prestamo", "deuda", "banco", "comision", "inversion",
+    "Finanzas": ["afp", "apv", "deposito a plazo", "fondo mutuo", "cuota", "credito", "linea de credito", "avance", "seguro", "tarjeta", "prestamo", "deuda", "banco", "comision", "inversion",
                  "ahorro", "cripto"],
 }
 OTROS = "Otros"
@@ -60,9 +61,10 @@ class Expense:
 
 # ----------------------------------------------------------------- parseo ---
 
-_MULTIPLIERS = {"mil": 1_000, "k": 1_000, "millon": 1_000_000, "millones": 1_000_000}
+_MULTIPLIERS = {"mil": 1_000, "k": 1_000, "luca": 1_000, "lucas": 1_000,
+                "millon": 1_000_000, "millones": 1_000_000, "palo": 1_000_000, "palos": 1_000_000}
 _AMOUNT_RE = re.compile(
-    r"(?:\$|usd|us\$|€)?\s*(\d[\d.,]*)\s*(mil|k|millon|millones)?\b"
+    r"(?:\$|usd|us\$|€)?\s*(\d[\d.,]*)\s*(mil|k|lucas?|millon|millones|palos?)?\b"
 )
 
 
@@ -88,6 +90,7 @@ def parse_number(raw: str) -> float:
 
 def parse_expense(texto: str) -> tuple[float, str] | None:
     """Extrae (monto, descripción) de algo como '25.50 en el super'."""
+    texto = re.sub(r"\b(?:una|un) (luca|palo)\b", r"1 \1", texto)  # "una luca" = 1.000
     m = _AMOUNT_RE.search(texto)
     if not m:
         return None
@@ -111,8 +114,24 @@ def categorize(descripcion: str) -> str:
     return OTROS
 
 
+def currency() -> str:
+    """Moneda configurada (ALFRED_MONEDA). Por defecto peso chileno."""
+    return os.environ.get("ALFRED_MONEDA", "CLP").upper()
+
+
+def _sin_decimales() -> bool:
+    return currency() in ("CLP", "COP", "PYG", "JPY", "KRW")
+
+
 def money(x: float) -> str:
+    """$15.990 en pesos chilenos; $15,990.00 en otras monedas."""
+    if _sin_decimales():
+        return "$" + f"{x:,.0f}".replace(",", ".")
     return f"${x:,.2f}"
+
+
+def excel_format() -> str:
+    return '"$"#,##0' if _sin_decimales() else "#,##0.00"
 
 
 # ----------------------------------------------------------------- libro ----
@@ -148,9 +167,15 @@ class ExpenseBook:
         ws = wb["Gastos"]
         ws.append([exp.fecha, exp.hora, exp.monto, exp.categoria, exp.descripcion])
         ws.cell(ws.max_row, 1).number_format = "DD/MM/YYYY"
-        ws.cell(ws.max_row, 3).number_format = "#,##0.00"
-        wb.save(self.path)
+        ws.cell(ws.max_row, 3).number_format = excel_format()
+        self._save(wb)
         return exp
+
+    def _save(self, wb) -> None:
+        try:
+            wb.save(self.path)
+        except PermissionError:
+            raise RuntimeError("el archivo gastos.xlsx está abierto en Excel; ciérralo y repíteme el gasto") from None
 
     def all(self) -> list[Expense]:
         if not self.path.exists():
@@ -175,7 +200,7 @@ class ExpenseBook:
         wb = self._open()
         ws = wb["Gastos"]
         ws.delete_rows(len(items) + 1)
-        wb.save(self.path)
+        self._save(wb)
         return items[-1]
 
     # ------------------------------------------------------------- reporte --
@@ -223,7 +248,7 @@ class ExpenseBook:
             ws.cell(i, 1, k).font = bold
             c = ws.cell(i, 2, v)
             if isinstance(v, float):
-                c.number_format = "#,##0.00"
+                c.number_format = excel_format()
 
         start = 10
         for j, h in enumerate(["Categoría", "Monto", "% del total"], start=1):
@@ -231,7 +256,7 @@ class ExpenseBook:
             c.font, c.fill = head_font, head_fill
         for i, (cat, monto) in enumerate(s["por_categoria"].items(), start=start + 1):
             ws.cell(i, 1, cat)
-            ws.cell(i, 2, monto).number_format = "#,##0.00"
+            ws.cell(i, 2, monto).number_format = excel_format()
             ws.cell(i, 3, monto / s["total"]).number_format = "0.0%"
         end = start + len(s["por_categoria"])
         ws.column_dimensions["A"].width = 30
@@ -251,7 +276,7 @@ class ExpenseBook:
         for d, m in s["por_dia"].items():
             wd.append([d, m])
             wd.cell(wd.max_row, 1).number_format = "DD/MM/YYYY"
-            wd.cell(wd.max_row, 2).number_format = "#,##0.00"
+            wd.cell(wd.max_row, 2).number_format = excel_format()
         wd.column_dimensions["A"].width = 12
         bar = BarChart()
         bar.title = "Gasto diario"
@@ -267,7 +292,7 @@ class ExpenseBook:
         for e in sorted(items, key=lambda e: (e.fecha, e.hora)):
             det.append([e.fecha, e.hora, e.monto, e.categoria, e.descripcion])
             det.cell(det.max_row, 1).number_format = "DD/MM/YYYY"
-            det.cell(det.max_row, 3).number_format = "#,##0.00"
+            det.cell(det.max_row, 3).number_format = excel_format()
         for col, width in zip("ABCDE", (12, 8, 12, 14, 40)):
             det.column_dimensions[col].width = width
 

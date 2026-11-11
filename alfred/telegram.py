@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 LIMITE = 4000  # Telegram admite hasta 4096 caracteres por mensaje
@@ -27,8 +28,14 @@ def _call(method: str, http_timeout: int = 30, **params):
     req = urllib.request.Request(
         f"https://api.telegram.org/bot{token}/{method}",
         data=json.dumps(params).encode(), headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=http_timeout) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=http_timeout) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 409:
+            raise RuntimeError("otro Alfred está usando este bot de Telegram (¿tienes el servicio "
+                               "abierto en tu otro computador?). Deja el servicio en uno solo.") from None
+        raise
     if not data.get("ok"):
         raise RuntimeError(data.get("description", "error de Telegram"))
     return data["result"]

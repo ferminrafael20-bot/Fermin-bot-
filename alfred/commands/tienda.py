@@ -2,7 +2,7 @@
 
 Ejemplos: "audita mi tienda", "revisa mi tienda de shopify".
 Con Claude: "mejora la descripción del sérum de vitamina C", "pon el labial
-rojo a 15.990", "¿qué productos debería arreglar primero?".
+rojo a $15.990", "¿qué productos debería arreglar primero?".
 """
 
 from alfred import shopify
@@ -48,7 +48,7 @@ def t_buscar(ctx, args):
        "seo_titulo": {"type": "string"}, "seo_descripcion": {"type": "string"},
        "etiquetas": {"type": "string", "description": "Separadas por coma, o vacío."},
        "estado": {"type": "string", "enum": ["", "ACTIVE", "DRAFT", "ARCHIVED"]},
-       "precio": {"type": "string", "description": "Nuevo precio, p. ej. '15990.00', o vacío."},
+       "precio": {"type": "string", "description": "Nuevo precio en la moneda de la tienda, sin puntos de miles (p. ej. '15990'), o vacío."},
        "variantes_ids": {"type": "array", "items": {"type": "string"},
                          "description": "IDs de variantes para el precio (vacío si no cambia)."}})
 def t_actualizar(ctx, args):

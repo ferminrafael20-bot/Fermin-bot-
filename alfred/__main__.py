@@ -20,6 +20,22 @@ import time
 from alfred.core import Alfred
 
 
+def _preparar_salida(log_dir) -> None:
+    """Con pythonw (Windows) o al iniciar con el sistema no hay consola: se usa un log.
+    Además evita errores con emojis en consolas antiguas."""
+    if sys.stdout is None or sys.stderr is None:
+        from pathlib import Path
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
+        log = open(Path(log_dir) / "alfred.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Alfred, tu asistente personal")
     parser.add_argument("-c", "--comando", help="ejecuta un comando y termina")
@@ -42,6 +58,7 @@ def main(argv=None) -> int:
         return 0
 
     alfred = Alfred(data_dir=args.datos, brain=False if args.sin_claude else None)
+    _preparar_salida(alfred.ctx.data_dir)
     from alfred.tareas import Scheduler
     scheduler = Scheduler(alfred)
 
@@ -107,7 +124,8 @@ def servicio(alfred, scheduler) -> int:
     puente = telegram.TelegramBridge(alfred) if telegram.configured() else None
     for msg in alfred.startup():
         print(msg)
-    print("Alfred en modo servicio" + (" con Telegram" if puente else "") + ". Ctrl+C para salir.")
+    print(f"[{time.strftime('%Y-%m-%d %H:%M')}] Alfred en modo servicio"
+          + (" con Telegram" if puente else "") + ". Ctrl+C para salir.")
     try:
         while True:
             scheduler.check()

@@ -11,7 +11,7 @@ PLANTILLA = """# Mi perfil para Alfred
 
 ## Sobre mí
 - Nombre:
-- País y moneda:
+- País y moneda: Chile, peso chileno (CLP)
 - Idioma preferido: español
 
 ## Mis negocios online

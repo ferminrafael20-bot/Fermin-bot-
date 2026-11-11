@@ -237,3 +237,30 @@ def test_profile_template_created(alfred):
     from alfred import profile
     assert profile.load(alfred.ctx.data_dir) == ""  # plantilla vacía
     assert "Perfil de inversor" in (alfred.ctx.data_dir / "perfil.md").read_text()
+
+
+def test_pesos_chilenos_clp(alfred, monkeypatch):
+    monkeypatch.setenv("ALFRED_MONEDA", "CLP")
+    assert alfred.handle("gasté 15.990 en el Jumbo") == "Anotado: $15.990 en Comida (Jumbo)."
+    assert "$5.000 en Transporte" in alfred.handle("gasté 5 lucas en bencina")
+    assert "$1.000" in alfred.handle("gasté una luca en pan")
+    assert "$2.000.000 en Hogar" in alfred.handle("pagué 2 palos de arriendo")
+    assert "$2.021.990" in alfred.handle("¿cuánto llevo gastado este mes?")
+    from openpyxl import load_workbook
+    ws = load_workbook(alfred.ctx.data_dir / "gastos.xlsx")["Gastos"]
+    assert ws["C2"].number_format == '"$"#,##0'
+
+
+def test_voz_espanol_prefiere_chile():
+    from alfred.voice import _voz_espanol
+
+    class V:
+        def __init__(self, id, name, languages):
+            self.id, self.name, self.languages = id, name, languages
+
+    voces = [V("en", "Samantha", ["en_US"]), V("es", "Mónica", ["es_ES"]),
+             V("mx", "Paulina", ["es_MX"]), V("cl", "Francisca", ["es-CL"])]
+    assert _voz_espanol(voces) == "cl"
+    assert _voz_espanol(voces[:3]) == "mx"
+    assert _voz_espanol([V("w", "Microsoft Sabina Desktop - Spanish (Mexico)", [])]) == "w"
+    assert _voz_espanol(voces[:1]) is None
