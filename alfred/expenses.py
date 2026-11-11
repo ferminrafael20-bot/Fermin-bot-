@@ -100,7 +100,8 @@ def parse_expense(texto: str) -> tuple[float, str] | None:
 
 def categorize(descripcion: str) -> str:
     """Asigna una categoría según palabras clave (primera coincidencia)."""
-    desc = f" {descripcion.lower()} "
+    from .core import normalize
+    desc = f" {normalize(descripcion)} "
     for categoria, palabras in CATEGORIAS.items():
         if categoria.lower() in desc:
             return categoria

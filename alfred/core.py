@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import threading
 import pkgutil
 import re
 import unicodedata
@@ -29,6 +30,20 @@ def normalize(text: str) -> str:
     text = re.sub(r"[¿?¡!]", "", text)
     text = re.sub(r"^(oye\s+|hey\s+)?alfred(?:o)?[\s,:.]*", "", text)
     return re.sub(r"\s+", " ", text).strip(" .")
+
+
+def original_text(original: str, fragment: str) -> str:
+    """Recupera del texto original (con tildes y mayúsculas) el fragmento
+    normalizado ``fragment``. Si no lo encuentra, devuelve ``fragment``."""
+    if not fragment:
+        return fragment
+    words = original.split()
+    norm = [normalize(w).strip(",.;:") for w in words]
+    target = [w.strip(",.;:") for w in fragment.split()]
+    for i in range(len(words) - len(target) + 1):
+        if norm[i:i + len(target)] == target:
+            return " ".join(words[i:i + len(target)]).strip("¿?¡!,.;: ")
+    return fragment
 
 
 @dataclass
@@ -77,6 +92,61 @@ def registered_commands() -> list[Command]:
     return list(_REGISTRY)
 
 
+# ------------------------------------------------- herramientas para Claude --
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    schema: dict
+    fn: Callable[["Context", dict], str]
+    strict: bool = True
+
+
+_TOOLS: dict[str, Tool] = {}
+
+
+def tool(name: str, description: str, properties: dict, required: list[str] | None = None):
+    """Registra una función como herramienta que Claude puede usar.
+
+    La función recibe ``(ctx, args)`` y devuelve un texto con el resultado.
+    Si lanza una excepción, Claude recibe el error y puede reintentar.
+    """
+    required = list(properties) if required is None else required
+
+    def decorator(fn):
+        schema = {"type": "object", "properties": properties,
+                  "required": required, "additionalProperties": False}
+        _TOOLS[name] = Tool(name, description, schema, fn,
+                            strict=set(required) == set(properties))
+        return fn
+
+    return decorator
+
+
+def registered_tools() -> list[Tool]:
+    return list(_TOOLS.values())
+
+
+def ask_confirmation(ctx: "Context", description: str, action: Callable[[], str]) -> str:
+    """Deja una acción pendiente hasta que el usuario diga "sí"."""
+    ctx.extras["pendiente"] = (description, action)
+    return f"{description}\n¿Lo hago? Di 'sí' para confirmar o 'no' para cancelar."
+
+
+def load_env(*paths: Path) -> None:
+    """Carga variables de archivos .env (sin pisar las ya definidas)."""
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
 def load_commands() -> None:
     """Importa todos los módulos de ``alfred/commands`` (descubrimiento automático)."""
     from . import commands as pkg
@@ -113,10 +183,13 @@ class Alfred:
 
     def __init__(self, data_dir: Path | str | None = None,
                  clock: Callable[[], datetime] = datetime.now, brain=None):
+        load_env(Path.cwd() / ".env")
         load_commands()
         path = Path(data_dir) if data_dir else default_data_dir()
         path.mkdir(parents=True, exist_ok=True)
+        load_env(path / ".env")
         self.ctx = Context(data_dir=path, clock=clock)
+        self.lock = threading.RLock()  # comandos y tareas programadas no se pisan
         self.brain = None
         if brain is None or brain is True:
             from .brain import ClaudeBrain, claude_available
@@ -142,13 +215,14 @@ class Alfred:
         """Comandos fijos primero (rápidos y sin costo); si no, Claude."""
         if not normalize(text):
             return "¿Sí? Dime qué necesitas."
-        respuesta = self.run_command(text)
-        if respuesta is not UNKNOWN or self.brain is None:
-            return respuesta
-        try:
-            return self.brain.ask(text)
-        except Exception as exc:
-            return f"No pude hablar con Claude ({type(exc).__name__}: {exc})."
+        with self.lock:
+            respuesta = self.run_command(text)
+            if respuesta is not UNKNOWN or self.brain is None:
+                return respuesta
+            try:
+                return self.brain.ask(text)
+            except Exception as exc:
+                return f"No pude hablar con Claude ({type(exc).__name__}: {exc})."
 
     def run_command(self, text: str) -> str:
         """Ejecuta solo los comandos fijos (sin Claude)."""

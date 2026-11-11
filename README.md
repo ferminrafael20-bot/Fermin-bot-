@@ -88,110 +88,119 @@ pytest tests/ -v
 
 # 🤖 Alfred — asistente personal
 
-Prototipo de asistente personal (estilo Jarvis), en español, pensado para **ir agregándole
-comandos**. Funciona por texto o por voz.
+Asistente personal en español (estilo Jarvis), por texto, voz o Telegram,
+conectado con Claude y pensado para **ir agregándole funciones**.
 
 ```bash
-python -m alfred                         # modo texto
-python -m alfred --voz                   # modo voz (micrófono + altavoz)
-python -m alfred -c "gasté 20 en café"   # un solo comando
+pip install -r requirements.txt
+cp .env.ejemplo .env          # y rellena tus claves (ver guías abajo)
+python -m alfred              # modo texto
+python -m alfred --voz        # modo voz
+python -m alfred --servicio   # en segundo plano: avisos, noticias de las 6:00 y Telegram
 ```
 
-## Conectado con Claude 🧠
+## Funciones
 
-Si configuras tu clave de la API de Anthropic, todo lo que no entienda un
-comando fijo lo responde **Claude**. Claude conversa contigo, recuerda la
-conversación y **puede usar los comandos de Alfred**:
-
-```bash
-export ANTHROPIC_API_KEY="tu-clave"   # Windows: set ANTHROPIC_API_KEY=tu-clave
-python -m alfred
-```
-
-Ejemplos que solo funcionan con Claude:
-
-- "Ayer almorcé con Ana, pagué la mitad de 600 y luego un uber de 200" → anota 300 en Comida y 200 en Transporte
-- "¿Estoy gastando mucho en comida comparado con transporte?"
-- "¿Qué opinan mis estrategias sobre Solana ahora mismo?"
-
-Cómo funciona: primero se prueban los comandos fijos (rápidos y sin costo);
-solo si ninguno entiende la frase se llama a Claude. Claude tiene dos
-herramientas: `registrar_gasto` y `ejecutar_comando`, que puede lanzar
-**cualquier** comando registrado con `@command`. Así, los comandos nuevos que
-agregues también los puede usar Claude sin tocar nada más.
-
-| Variable | Para qué | Por defecto |
+| # | Función | Ejemplos |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Tu clave (consíguela en console.anthropic.com) | — |
-| `ALFRED_MODEL` | Modelo de Claude | `claude-opus-5-5` |
-| `ALFRED_EFFORT` | `low` (rápido), `medium` o `high` (piensa más) | `low` |
+| 1 | **Organizar archivos** (por tipo o fecha, con confirmación y "deshacer") | "organiza mis descargas", "organiza el escritorio por fecha", "deshaz la organización", "archivos más grandes de descargas" |
+| 2 | **Auditar tu tienda Shopify** (Excel de problemas) y **hacer cambios** con confirmación | "audita mi tienda"; con Claude: "mejora la descripción y el SEO del sérum", "pon el labial a 15.990" |
+| 3 | **Noticias de cripto, forex y acciones por correo** cada día a las 6:00 | automático en `--servicio`; "noticias del día", "mándame las noticias" |
+| 4 | **Canchas**: abre EasyCancha y agenda la reserva | "reserva una cancha" |
+| 5 | **Aviso un día antes** de tus clases, con quién son, para escribirle | "tengo clase con Juan el martes a las 18", "todos los jueves clase con Sofía a las 19" |
+| 6 | **Recordatorios** | "recuérdame mañana a las 9 pagar la luz", "recuérdame en 20 minutos sacar la ropa" |
+| 7 | **Ayuda con tus negocios online** (Claude + tu perfil) e ideas guardadas | "dame 10 ideas de videos faceless", "guarda la idea …", "mis ideas" |
+| 8 | **Calendario de torneos** (exportable a Google Calendar) | "agenda el torneo Copa Primavera el 20 de diciembre a las 10", "mis próximos torneos", "exporta mi calendario" |
+| 9 | **Control desde el celular** (Telegram) y del PC | escribe a tu bot; "abre youtube", "abre spotify" |
+| 10 | **Orientación de inversiones** según tu perfil de inversor (educativa) | "¿cómo debería repartir 200 dólares al mes según mi perfil?" |
+| — | Gastos en Excel, reporte mensual, señales de trading | "gasté 25 en el súper", "reporte del mes", "señal de btc" |
 
-Di "nueva conversación" para que Claude olvide la charla, o arranca con
-`python -m alfred --sin-claude` para usar solo los comandos fijos. Cada
-consulta a Claude tiene un costo según el uso de la API.
+Di **"ayuda"** para ver la lista completa. Antes de mover archivos o cambiar
+la tienda, Alfred te muestra el plan y espera tu **"sí"**.
 
-## Lo que sabe hacer
+## Tu perfil (`datos_alfred/perfil.md`)
 
-| Comando | Ejemplos |
-|---|---|
-| Registrar gasto | "gasté 25.50 en el súper", "pagué 1.200 de renta", "anota gasto de 300 en uber", "gasté 2 mil en ropa", "compré 40 de regalo categoría ocio" |
-| Resumen | "¿cuánto llevo gastado este mes?", "¿en qué estoy gastando?", "¿cuánto gasté en octubre?" |
-| Reporte mensual (Excel) | "reporte del mes", "reporte del mes pasado", "reporte de octubre" |
-| Últimos gastos / corregir | "mis últimos gastos", "borra el último gasto" |
-| Señales de trading | "señal de btc", "qué dice la estrategia macd en sol", "señal de oro con datos de prueba" |
-| Generales | "ayuda", "¿qué hora es?", "¿qué día es hoy?", "adiós" |
+La primera vez se crea una plantilla. Rellénala con tus negocios (tienda,
+influencer con IA, canal faceless, portafolio), tu **perfil de inversor**
+(objetivo, horizonte, tolerancia al riesgo) y tus torneos. Claude la lee en
+cada conversación para darte ayuda personalizada.
 
-**Gastos:** se guardan en `datos_alfred/gastos.xlsx` (puedes abrirlo con Excel)
-y se clasifican solos por palabras clave (Comida, Transporte, Hogar,
-Servicios, Salud, Ocio, Compras, Educación, Finanzas, Otros). Las palabras
-clave están en `CATEGORIAS` dentro de `alfred/expenses.py`.
+## Configuración (archivo `.env`)
 
-**Reporte de fin de mes:** al arrancar el primer día de un mes nuevo,
-Alfred crea solo `datos_alfred/reportes/reporte_AAAA-MM.xlsx` del mes que
-terminó, con una hoja de resumen y gráfico de torta por categoría, una de
-gasto diario con gráfico de barras y una con el detalle. Si quieres que se
-genere aunque no abras Alfred, prográmalo el día 1 de cada mes:
+Copia `.env.ejemplo` como `.env`. Todo es opcional: configura solo lo que uses.
 
-```bash
-# cron (Linux/macOS): día 1 a las 8:00
-0 8 1 * * cd /ruta/Fermin-bot- && python -m alfred -c "reporte del mes pasado"
-```
+**Claude** — `ANTHROPIC_API_KEY` desde console.anthropic.com. Sin Claude
+funcionan los comandos fijos; con Claude entiende frases libres, busca en
+internet y usa todas las funciones.
 
-**Voz:** di "Alfred" (o "Alfredo") al inicio si quieres; se ignora solo. `pip install SpeechRecognition pyttsx3 pyaudio`. El reconocimiento
-de voz usa Google (requiere internet) y la respuesta hablada funciona offline.
+**Correo (Gmail)** — activa la verificación en 2 pasos en tu cuenta de Google,
+crea una *contraseña de aplicación* (Cuenta de Google → Seguridad →
+Contraseñas de aplicaciones) y pon `ALFRED_EMAIL_USER` y
+`ALFRED_EMAIL_PASSWORD`. Hora de las noticias: `ALFRED_HORA_NOTICIAS=06:00`.
 
-## Cómo agregar un comando nuevo
+**Telegram** — en Telegram habla con @BotFather, envía `/newbot` y copia el
+token en `ALFRED_TELEGRAM_TOKEN`. Escríbele algo a tu bot, ejecuta
+`python -m alfred --telegram-id` y pon el número en `ALFRED_TELEGRAM_CHAT_ID`.
+Alfred solo responde a ese chat. Los recordatorios y avisos también te
+llegan por ahí.
 
-1. Copia `alfred/commands/_plantilla.py` a `alfred/commands/mi_comando.py`.
-   Cualquier archivo de esa carpeta se carga solo; los que empiezan por `_`
-   se ignoran.
-2. Define la función con `@command`:
+**Shopify** — crea una app para tu tienda (en el admin de Shopify: Configuración
+→ Apps → Desarrollar apps, o desde el Dev Dashboard de Shopify) con permisos
+`read_products` y `write_products`, y copia el token de Admin API en
+`ALFRED_SHOPIFY_TOKEN`. En `ALFRED_SHOPIFY_STORE` pon el nombre que va antes de
+`.myshopify.com`.
+
+**Aviso de clases y torneos** — `ALFRED_HORA_AVISO=10:00` (hora a la que te
+avisa de lo que tienes mañana).
+
+## Dejarlo siempre encendido
+
+Los recordatorios, avisos y noticias necesitan que Alfred esté corriendo:
+
+- **Windows**: crea un acceso directo con
+  `pythonw -m alfred --servicio` (con "Iniciar en" la carpeta del proyecto) y
+  ponlo en la carpeta de inicio (`Win+R` → `shell:startup`).
+- **Mac/Linux**: agrega a cron `@reboot cd /ruta/Fermin-bot- && python3 -m alfred --servicio`.
+
+Si el PC estaba apagado a las 6:00, las noticias se envían al encenderlo
+(hasta las 12:00).
+
+## Cómo agregar funciones nuevas
+
+1. Copia `alfred/commands/_plantilla.py` a `alfred/commands/mi_funcion.py`.
+   Cada archivo de esa carpeta se carga solo.
+2. Usa `@command` para frases fijas y `@tool` para que Claude pueda usarla:
 
 ```python
-from alfred.core import command
+from alfred.core import command, tool
 
-@command("recordatorio", r"^recuerdame (.+)$",
-         help="Guarda un recordatorio.", examples=["recuérdame pagar la luz"])
-def recordatorio(ctx, match, texto):
-    (ctx.data_dir / "recordatorios.txt").open("a").write(match.group(1) + "\n")
-    return f"Listo, te recordaré: {match.group(1)}"
+@command("saludo formal", r"^presentate$", help="Se presenta.", examples=["preséntate"])
+def presentate(ctx, match, texto):
+    return "Soy Alfred, a su servicio."
+
+@tool("convertir_moneda", "Convierte un monto entre monedas.",
+      {"monto": {"type": "number"}, "de": {"type": "string"}, "a": {"type": "string"}})
+def convertir(ctx, args):
+    ...
+    return "resultado"
 ```
 
-Los patrones se comparan con el texto **en minúsculas y sin tildes** (escribe
-"recuerdame", no "recuérdame"), y la palabra "Alfred" al inicio se quita
-sola. Si necesitas algo al arrancar (como el reporte automático), usa el
-decorador `@on_startup`.
+Los patrones de `@command` se comparan con el texto en minúsculas y sin
+tildes. Para acciones delicadas usa `ask_confirmation(ctx, "descripción", accion)`.
 
 ```
 alfred/
-  core.py           # registro de comandos, normalización y despacho
-  expenses.py       # Excel de gastos, categorías y reportes
-  brain.py          # conexión con Claude (herramientas e historial)
-  voice.py          # micrófono y voz (opcional)
-  __main__.py       # interfaz de texto/voz
-  commands/
-    general.py      # ayuda, hora, fecha, saludo, salir
-    gastos.py       # gastos y reportes
-    trading.py      # señales de las 5 estrategias
-    _plantilla.py   # plantilla para comandos nuevos
+  core.py        # comandos, herramientas, confirmaciones, .env
+  brain.py       # Claude: herramientas, búsqueda web y perfil
+  tareas.py      # recordatorios, aviso del día antes, noticias de las 6:00
+  agenda.py      # clases, torneos, eventos y recordatorios (+ exportar .ics)
+  dateparse.py   # fechas en español ("mañana a las 9", "todos los martes")
+  expenses.py    # Excel de gastos y reportes
+  files.py       # organizar carpetas
+  shopify.py     # auditoría y cambios en Shopify
+  news.py        # resumen de noticias con búsqueda web
+  notify.py      # avisos por pantalla, correo y Telegram
+  telegram.py    # bot de Telegram
+  profile.py     # plantilla del perfil
+  commands/      # agenda, archivos, gastos, general, noticias, notas, pc, tienda, trading
 ```

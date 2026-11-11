@@ -1,6 +1,6 @@
 """Comandos generales: ayuda, hora, fecha, saludo y salir."""
 
-from alfred.core import command, registered_commands
+from alfred.core import UNKNOWN, command, registered_commands
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
@@ -53,3 +53,20 @@ def nueva_conversacion(ctx, match, texto):
     if brain:
         brain.reset()
     return "Listo, empezamos de cero."
+
+
+@command("confirmar", [r"^(si|confirmo|confirmado|dale|hazlo|adelante|ok|okay|de acuerdo|claro)( por favor| hazlo)?$"],
+         help="Confirma la acción pendiente.", examples=["sí"], priority=1)
+def confirmar(ctx, match, texto):
+    pendiente = ctx.extras.pop("pendiente", None)
+    if not pendiente:
+        return UNKNOWN  # sin nada pendiente, quizá le responde a Claude
+    return pendiente[1]()
+
+
+@command("cancelar", [r"^(no|cancela|cancelar|mejor no|olvidalo|detente)$"],
+         help="Cancela la acción pendiente.", examples=["no"], priority=1)
+def cancelar(ctx, match, texto):
+    if not ctx.extras.pop("pendiente", None):
+        return UNKNOWN
+    return "Cancelado, no hice nada."

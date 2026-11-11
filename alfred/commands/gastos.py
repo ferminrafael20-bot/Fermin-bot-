@@ -11,7 +11,7 @@ Ejemplos de frases:
 
 import re
 
-from alfred.core import UNKNOWN, command, on_startup
+from alfred.core import UNKNOWN, command, on_startup, original_text, tool
 from alfred.expenses import (CATEGORIAS, MESES, OTROS, ExpenseBook, money,
                              parse_expense, summary_text)
 
@@ -48,6 +48,7 @@ def registrar(ctx, match, texto):
     if not parsed:
         return "No encontré el monto. Prueba algo como: 'gasté 20 en comida'."
     monto, descripcion = parsed
+    descripcion = original_text(texto, descripcion)
     if monto <= 0:
         return "El monto debe ser mayor que cero."
     exp = _book(ctx).add(monto, descripcion, categoria, when=ctx.now())
@@ -132,3 +133,17 @@ def reporte_automatico(ctx):
         return None
     path, s = book.build_report(y, m)
     return f"Terminó {MESES[m - 1]}. Te preparé el reporte:\n{summary_text(s, y, m)}\nArchivo: {path}"
+
+
+@tool("registrar_gasto", "Anota un gasto del usuario en su Excel de gastos. Si menciona varios, "
+      "llama una vez por cada uno. Calcula el monto si hace falta (la mitad de 600 = 300).",
+      {"monto": {"type": "number", "description": "Monto gastado, mayor que 0."},
+       "descripcion": {"type": "string", "description": "Descripción corta, p. ej. 'almuerzo con Ana'."},
+       "categoria": {"type": "string", "enum": list(CATEGORIAS) + [OTROS]}})
+def t_registrar_gasto(ctx, args):
+    monto = float(args.get("monto", 0))
+    if monto <= 0:
+        raise ValueError("El monto debe ser mayor que cero.")
+    exp = _book(ctx).add(monto, str(args.get("descripcion", "")).strip() or "sin descripción",
+                         args.get("categoria"), when=ctx.now())
+    return f"Anotado: {money(exp.monto)} en {exp.categoria} ({exp.descripcion})."

@@ -67,7 +67,10 @@ def test_claude_registers_free_form_expenses(tmp_path):
     assert first["model"] == "claude-opus-5-5"
     assert first["fallbacks"] == "default"
     assert first["output_config"] == {"effort": "low"}
-    assert {t["name"] for t in first["tools"]} == {"registrar_gasto", "ejecutar_comando"}
+    nombres = {t["name"] for t in first["tools"]}
+    assert {"registrar_gasto", "ejecutar_comando", "crear_evento", "organizar_carpeta",
+            "auditar_tienda_shopify", "guardar_nota", "web_search"} <= nombres
+    assert "Perfil" in first["system"][1]["text"] or "perfil" in first["system"][1]["text"]
     # el segundo turno reenvía el razonamiento y devuelve ambos resultados juntos
     assert second["messages"][1]["content"][0]["type"] == "thinking"
     results = second["messages"][2]["content"]
@@ -114,3 +117,34 @@ def test_refusal_and_api_errors(tmp_path):
     j.brain.client = anthropic.Anthropic(api_key="t", max_retries=0, http_client=anthropic.DefaultHttpxClient(
         transport=httpx.MockTransport(boom)))
     assert "No pude hablar con Claude" in j.handle("otra cosa")
+
+
+def test_claude_creates_event_and_confirmation_flow(tmp_path):
+    j, api = make_alfred(tmp_path, [
+        _msg([{"type": "tool_use", "id": "tu_1", "name": "crear_evento",
+               "input": {"tipo": "clase", "titulo": "Clase con Ana", "fecha_hora": "2026-10-16T18:00",
+                         "persona": "Ana", "lugar": "", "semanal": True}}], stop_reason="tool_use"),
+        _msg([{"type": "text", "text": "Agendé tu clase con Ana todos los viernes."}]),
+    ])
+    j.handle("los viernes a las 6 doy clase a Ana, apúntalo")
+    from alfred.agenda import Agenda
+    ev = Agenda(tmp_path).all()[0]
+    assert (ev.persona, ev.semanal, ev.fecha) == ("Ana", True, "2026-10-16T18:00")
+
+
+def test_pause_turn_is_resumed(tmp_path):
+    j, api = make_alfred(tmp_path, [_msg([], stop_reason="pause_turn"),
+                                    _msg([{"type": "text", "text": "BTC está en 100k."}])])
+    assert j.handle("¿a cuánto está el bitcoin?") == "BTC está en 100k."
+    assert len(api.requests) == 2
+
+
+def test_news_digest_collects_sources(tmp_path):
+    from alfred import news
+    j, api = make_alfred(tmp_path, [_msg([
+        {"type": "text", "text": "Resumen: BTC sube.",
+         "citations": [{"type": "web_search_result_location", "url": "https://ej.com/a", "title": "Nota A",
+                        "cited_text": "x", "encrypted_index": "e"}]}])])
+    texto = news.build_digest(j.brain, datetime(2026, 10, 15, 6, 0))
+    assert "BTC sube" in texto and "https://ej.com/a" in texto
+    assert api.requests[0]["tools"][0]["type"] == "web_search_20260209"

@@ -1,13 +1,14 @@
 """Cerebro de Alfred con Claude (API de Anthropic).
 
 Cuando ningún comando fijo entiende la frase, Alfred se la pasa a Claude.
-Claude conversa en español y puede usar herramientas de Alfred:
+Claude conversa en español, lee tu perfil (datos_alfred/perfil.md), puede
+buscar en internet y usa las herramientas de Alfred:
 
-* ``registrar_gasto``: anota gastos aunque los digas de forma libre
-  ("ayer almorcé con Ana y pagué la mitad de 600").
-* ``ejecutar_comando``: ejecuta cualquier comando registrado con ``@command``,
-  así que los comandos nuevos que agregues quedan disponibles para Claude
-  automáticamente.
+* las registradas con ``@tool`` en los módulos de ``alfred/commands``
+  (gastos, agenda, notas, archivos, tienda, PC...);
+* ``ejecutar_comando``: cualquier comando registrado con ``@command``.
+
+Así, lo que agregues a Alfred queda disponible para Claude automáticamente.
 
 Configuración por variables de entorno:
   ANTHROPIC_API_KEY  clave de la API (o un perfil de ``ant auth login``)
@@ -20,70 +21,70 @@ from __future__ import annotations
 import json
 import os
 
-from .core import Context, registered_commands
+from . import profile
+from .core import Context, registered_commands, registered_tools
 
 DEFAULT_MODEL = "claude-opus-5-5"
-MAX_TOOL_ROUNDS = 8
+MAX_ROUNDS = 10
+WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 
-SYSTEM_PROMPT = """Eres Alfred, el asistente personal de tu usuario. Hablas en español, \
-con un tono cercano y profesional.
+SYSTEM_PROMPT = """Eres Alfred, el asistente personal de tu usuario, al estilo de un mayordomo \
+eficiente y cercano. Hablas en español.
 
-Tus respuestas a menudo se leen en voz alta, así que sé breve (normalmente una a tres \
-frases), sin markdown, sin listas largas ni emojis.
+Tus respuestas a menudo se leen en voz alta o en el celular, así que sé breve (normalmente \
+una a tres frases), sin markdown ni listas largas, salvo que el usuario pida algo extenso \
+como un guion, un plan o un análisis.
 
-Tienes herramientas para actuar en el sistema del usuario:
-- registrar_gasto: úsala cada vez que el usuario cuente que gastó o pagó algo, aunque lo \
-diga de forma indirecta. Calcula tú el monto si hace falta (por ejemplo, "la mitad de 600" \
-son 300). Si un mensaje menciona varios gastos, regístralos todos. Si no está claro el \
-monto, pregúntalo en vez de inventarlo.
-- ejecutar_comando: ejecuta uno de los comandos de Alfred escribiendo una frase de ejemplo \
-de ese comando. Úsala para resúmenes de gastos, reportes, señales de trading, la hora y \
-cualquier otra cosa que un comando pueda hacer.
+Cómo actuar:
+- Usa las herramientas para hacer las cosas en vez de explicar cómo hacerlas. Si el usuario \
+cuenta que gastó algo, regístralo. Si menciona una clase, torneo, cita o algo que recordar, \
+agéndalo con crear_evento (las fechas que recibes y escribes son hora local; la fecha y \
+hora actuales vienen al inicio de cada mensaje del usuario).
+- Si falta un dato imprescindible (monto, fecha, hora), pregúntalo en vez de inventarlo.
+- Algunas herramientas dejan una acción pendiente de confirmación (organizar archivos, \
+cambios en la tienda). En ese caso explica qué se hará y pide que responda "sí".
+- Usa web_search para datos actuales: precios, noticias, resultados, horarios.
+- ejecutar_comando sirve para todo lo demás que Alfred sabe hacer (resúmenes y reportes de \
+gastos, señales de trading, hora, etc.).
 
-Cuando una herramienta devuelva datos, contéstale al usuario con lo importante en lenguaje \
-natural. Las señales de trading son información técnica, no asesoramiento financiero; si el \
-usuario te pide que decidas por él una operación, recuérdaselo brevemente."""
+Negocios online: ayuda con la tienda Shopify, el influencer con IA, el canal de YouTube \
+faceless y el portafolio con ideas concretas, guiones, títulos, descripciones, SEO, \
+calendarios de contenido y estrategias de crecimiento y monetización. Puedes guardar ideas \
+con guardar_nota.
+
+Inversiones: puedes orientar según el perfil de inversor del usuario (objetivo, horizonte, \
+tolerancia al riesgo): explica opciones, riesgos, costos y diversificación, y propone \
+alternativas acordes a su perfil. Aclara brevemente que es información educativa y no \
+asesoría financiera profesional, nunca prometas rendimientos y desaconseja arriesgar dinero \
+que no pueda perder. Si su perfil de inversor está vacío, hazle primero 3 o 4 preguntas \
+cortas y sugiérele guardarlo en su perfil. Las señales de trading de Alfred son técnicas, no \
+una garantía."""
 
 
-def _tools() -> list[dict]:
-    from .expenses import CATEGORIAS, OTROS
-
+def _command_tool() -> dict:
     catalogo = "\n".join(
         f"- {c.name}: {c.help} Ejemplos: {' | '.join(c.examples) or '—'}"
         for c in registered_commands()
-        if c.name not in ("salir", "registrar gasto")
+        if c.name not in ("salir", "registrar gasto", "confirmar", "cancelar")
     )
-    return [
-        {
-            "name": "registrar_gasto",
-            "description": "Anota un gasto del usuario en su Excel de gastos.",
-            "strict": True,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "monto": {"type": "number", "description": "Monto gastado, mayor que 0."},
-                    "descripcion": {"type": "string",
-                                    "description": "Descripción corta en minúsculas, p. ej. 'almuerzo con ana'."},
-                    "categoria": {"type": "string", "enum": list(CATEGORIAS) + [OTROS]},
-                },
-                "required": ["monto", "descripcion", "categoria"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "name": "ejecutar_comando",
-            "description": ("Ejecuta un comando de Alfred a partir de una frase y devuelve su "
-                            "respuesta. Escribe la frase igual que los ejemplos. Comandos "
-                            f"disponibles:\n{catalogo}"),
-            "strict": True,
-            "input_schema": {
-                "type": "object",
-                "properties": {"frase": {"type": "string"}},
-                "required": ["frase"],
-                "additionalProperties": False,
-            },
-        },
-    ]
+    return {
+        "name": "ejecutar_comando",
+        "description": ("Ejecuta un comando de Alfred a partir de una frase y devuelve su respuesta. "
+                        f"Escribe la frase igual que los ejemplos. Comandos disponibles:\n{catalogo}"),
+        "strict": True,
+        "input_schema": {"type": "object", "properties": {"frase": {"type": "string"}},
+                         "required": ["frase"], "additionalProperties": False},
+    }
+
+
+def build_tools() -> list[dict]:
+    tools = []
+    for t in sorted(registered_tools(), key=lambda t: t.name):  # orden fijo: favorece la caché
+        d = {"name": t.name, "description": t.description, "input_schema": t.schema}
+        if t.strict:
+            d["strict"] = True
+        tools.append(d)
+    return tools + [_command_tool(), WEB_SEARCH]
 
 
 class ClaudeBrain:
@@ -96,7 +97,7 @@ class ClaudeBrain:
             client = anthropic.Anthropic()
         self.client = client
         self.ctx = ctx
-        self.run_command = run_command  # función texto -> respuesta (solo comandos fijos)
+        self.run_command = run_command  # texto -> respuesta (solo comandos fijos)
         self.model = model or os.environ.get("ALFRED_MODEL", DEFAULT_MODEL)
         self.effort = effort or os.environ.get("ALFRED_EFFORT", "low")
         self.messages: list = []
@@ -104,37 +105,36 @@ class ClaudeBrain:
     def reset(self) -> None:
         self.messages = []
 
-    # ------------------------------------------------------------ tools --
+    def _system(self) -> list[dict]:
+        bloques = [{"type": "text", "text": SYSTEM_PROMPT}]
+        perfil = profile.load(self.ctx.data_dir)
+        bloques.append({"type": "text", "text": "Perfil del usuario:\n" + perfil if perfil else
+                        "El usuario aún no rellenó su perfil (archivo perfil.md en su carpeta de datos)."})
+        return bloques
+
     def _run_tool(self, name: str, args: dict) -> tuple[str, bool]:
-        if name == "registrar_gasto":
-            from .commands.gastos import _book
-            from .expenses import money
-            monto = float(args.get("monto", 0))
-            if monto <= 0:
-                return "El monto debe ser mayor que cero.", True
-            exp = _book(self.ctx).add(monto, str(args.get("descripcion", "")).strip() or "sin descripción",
-                                      args.get("categoria"), when=self.ctx.now())
-            return f"Anotado: {money(exp.monto)} en {exp.categoria} ({exp.descripcion}).", False
         if name == "ejecutar_comando":
             respuesta = self.run_command(str(args.get("frase", "")))
             return respuesta, respuesta.startswith("No entendí")
+        for t in registered_tools():
+            if t.name == name:
+                return str(t.fn(self.ctx, args)), False
         return f"Herramienta desconocida: {name}", True
 
-    # ------------------------------------------------------------- chat --
     def ask(self, texto: str) -> str:
         ahora = self.ctx.now()
         self.messages.append({
             "role": "user",
             # la fecha va en el mensaje (no en el system) para no invalidar la caché
-            "content": f"[{ahora:%Y-%m-%d %H:%M}] {texto}",
+            "content": f"[{ahora:%Y-%m-%d %H:%M}, {['lunes','martes','miércoles','jueves','viernes','sábado','domingo'][ahora.weekday()]}] {texto}",
         })
-        tools = _tools()
+        tools, system = build_tools(), self._system()
 
-        for _ in range(MAX_TOOL_ROUNDS):
+        for _ in range(MAX_ROUNDS):
             response = self.client.beta.messages.create(
                 model=self.model,
                 max_tokens=16000,
-                system=SYSTEM_PROMPT,
+                system=system,
                 tools=tools,
                 messages=self.messages,
                 output_config={"effort": self.effort},
@@ -142,11 +142,13 @@ class ClaudeBrain:
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
             )
-            # se guarda el contenido completo (incluye bloques de razonamiento)
+            # se guarda el contenido completo (incluye razonamiento y búsquedas)
             self.messages.append({"role": "assistant", "content": response.content})
 
             if response.stop_reason == "refusal":
                 return "Lo siento, con eso no puedo ayudarte."
+            if response.stop_reason == "pause_turn":
+                continue  # búsqueda web larga: se retoma
             if response.stop_reason != "tool_use":
                 texto_resp = "".join(b.text for b in response.content if b.type == "text").strip()
                 return texto_resp or "Listo."
