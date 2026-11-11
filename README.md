@@ -97,6 +97,39 @@ python -m jarvis --voz                   # modo voz (micrófono + altavoz)
 python -m jarvis -c "gasté 20 en café"   # un solo comando
 ```
 
+## Conectado con Claude 🧠
+
+Si configuras tu clave de la API de Anthropic, todo lo que no entienda un
+comando fijo lo responde **Claude**. Claude conversa contigo, recuerda la
+conversación y **puede usar los comandos de Jarvis**:
+
+```bash
+export ANTHROPIC_API_KEY="tu-clave"   # Windows: set ANTHROPIC_API_KEY=tu-clave
+python -m jarvis
+```
+
+Ejemplos que solo funcionan con Claude:
+
+- "Ayer almorcé con Ana, pagué la mitad de 600 y luego un uber de 200" → anota 300 en Comida y 200 en Transporte
+- "¿Estoy gastando mucho en comida comparado con transporte?"
+- "¿Qué opinan mis estrategias sobre Solana ahora mismo?"
+
+Cómo funciona: primero se prueban los comandos fijos (rápidos y sin costo);
+solo si ninguno entiende la frase se llama a Claude. Claude tiene dos
+herramientas: `registrar_gasto` y `ejecutar_comando`, que puede lanzar
+**cualquier** comando registrado con `@command`. Así, los comandos nuevos que
+agregues también los puede usar Claude sin tocar nada más.
+
+| Variable | Para qué | Por defecto |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Tu clave (consíguela en console.anthropic.com) | — |
+| `JARVIS_MODEL` | Modelo de Claude | `claude-opus-5-5` |
+| `JARVIS_EFFORT` | `low` (rápido), `medium` o `high` (piensa más) | `low` |
+
+Di "nueva conversación" para que Claude olvide la charla, o arranca con
+`python -m jarvis --sin-claude` para usar solo los comandos fijos. Cada
+consulta a Claude tiene un costo según el uso de la API.
+
 ## Lo que sabe hacer
 
 | Comando | Ejemplos |
@@ -153,6 +186,7 @@ decorador `@on_startup`.
 jarvis/
   core.py           # registro de comandos, normalización y despacho
   expenses.py       # Excel de gastos, categorías y reportes
+  brain.py          # conexión con Claude (herramientas e historial)
   voice.py          # micrófono y voz (opcional)
   __main__.py       # interfaz de texto/voz
   commands/

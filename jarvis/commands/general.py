@@ -43,3 +43,13 @@ def hora(ctx, match, texto):
 def fecha(ctx, match, texto):
     d = ctx.now()
     return f"Hoy es {DIAS[d.weekday()]} {d.day} de {MESES[d.month - 1]} de {d.year}."
+
+
+@command("nueva conversación", [r"^(nueva conversacion|olvida (todo|la conversacion)|reinicia(r)? (la )?conversacion)$"],
+         help="Hace que Claude olvide la conversación actual.",
+         examples=["nueva conversación"], priority=5)
+def nueva_conversacion(ctx, match, texto):
+    brain = ctx.extras.get("brain")
+    if brain:
+        brain.reset()
+    return "Listo, empezamos de cero."

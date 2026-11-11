@@ -19,7 +19,7 @@ class Clock:
 @pytest.fixture
 def jarvis(tmp_path):
     clock = Clock(datetime(2026, 10, 15, 10, 30))
-    j = Jarvis(data_dir=tmp_path, clock=clock)
+    j = Jarvis(data_dir=tmp_path, clock=clock, brain=False)
     j.clock = clock
     return j
 

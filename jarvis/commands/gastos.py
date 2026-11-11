@@ -11,7 +11,7 @@ Ejemplos de frases:
 
 import re
 
-from jarvis.core import command, on_startup
+from jarvis.core import UNKNOWN, command, on_startup
 from jarvis.expenses import (CATEGORIAS, MESES, OTROS, ExpenseBook, money,
                              parse_expense, summary_text)
 
@@ -40,6 +40,9 @@ def _forced_category(texto: str) -> tuple[str, str | None]:
          help="Anota un gasto en el Excel y lo clasifica por categoría.",
          examples=["gasté 25.50 en el súper", "pagué 1.200 de renta"], priority=20)
 def registrar(ctx, match, texto):
+    # Frases con varios montos ("300 en comida y 200 en uber") las resuelve Claude
+    if ctx.extras.get("brain") and len(re.findall(r"\d+", match.group(1).replace(".", "").replace(",", ""))) > 1:
+        return UNKNOWN
     cuerpo, categoria = _forced_category(match.group(1))
     parsed = parse_expense(cuerpo)
     if not parsed:

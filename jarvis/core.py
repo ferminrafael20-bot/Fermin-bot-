@@ -103,13 +103,28 @@ def default_data_dir() -> Path:
     return Path(os.environ.get("JARVIS_DATA_DIR", "datos_jarvis")).expanduser()
 
 
+UNKNOWN = "No entendí ese comando. Di 'ayuda' para ver lo que sé hacer."
+
+
 class Jarvis:
+    """Asistente. Si se le pasa un ``brain`` (p. ej. Claude), le envía lo que
+    ningún comando fijo entiende. ``brain=True`` lo crea con la configuración
+    por defecto; ``None`` lo activa solo si hay credenciales de Anthropic."""
+
     def __init__(self, data_dir: Path | str | None = None,
-                 clock: Callable[[], datetime] = datetime.now):
+                 clock: Callable[[], datetime] = datetime.now, brain=None):
         load_commands()
         path = Path(data_dir) if data_dir else default_data_dir()
         path.mkdir(parents=True, exist_ok=True)
         self.ctx = Context(data_dir=path, clock=clock)
+        self.brain = None
+        if brain is None or brain is True:
+            from .brain import ClaudeBrain, claude_available
+            if brain is True or claude_available():
+                self.brain = ClaudeBrain(self.ctx, self.run_command)
+        elif brain is not False:
+            self.brain = brain
+        self.ctx.extras["brain"] = self.brain
 
     def startup(self) -> list[str]:
         """Ejecuta las tareas de arranque y devuelve los mensajes que generen."""
@@ -124,9 +139,20 @@ class Jarvis:
         return messages
 
     def handle(self, text: str) -> str:
-        clean = normalize(text)
-        if not clean:
+        """Comandos fijos primero (rápidos y sin costo); si no, Claude."""
+        if not normalize(text):
             return "¿Sí? Dime qué necesitas."
+        respuesta = self.run_command(text)
+        if respuesta is not UNKNOWN or self.brain is None:
+            return respuesta
+        try:
+            return self.brain.ask(text)
+        except Exception as exc:
+            return f"No pude hablar con Claude ({type(exc).__name__}: {exc})."
+
+    def run_command(self, text: str) -> str:
+        """Ejecuta solo los comandos fijos (sin Claude)."""
+        clean = normalize(text)
         for cmd in _REGISTRY:
             for pattern in cmd.patterns:
                 match = pattern.search(clean)
@@ -135,7 +161,7 @@ class Jarvis:
                         return cmd.handler(self.ctx, match, text)
                     except Exception as exc:
                         return f"Tuve un problema con '{cmd.name}': {exc}"
-        return "No entendí ese comando. Di 'ayuda' para ver lo que sé hacer."
+        return UNKNOWN
 
     @property
     def should_exit(self) -> bool:

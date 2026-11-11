@@ -3,6 +3,10 @@
     python -m jarvis                       # modo texto (escribes los comandos)
     python -m jarvis --voz                 # modo voz (requiere micrófono)
     python -m jarvis -c "gasté 20 en café" # ejecuta un solo comando y sale
+    python -m jarvis --sin-claude          # solo comandos fijos, sin Claude
+
+Si hay credenciales de Anthropic (ANTHROPIC_API_KEY), lo que no entienda un
+comando fijo lo responde Claude, que además puede usar los comandos de Jarvis.
 
 Para el reporte a fin de mes, Jarvis lo genera solo al arrancar si el mes
 anterior aún no tiene reporte. También puedes programarlo (cron / Programador
@@ -21,9 +25,11 @@ def main(argv=None) -> int:
     parser.add_argument("-c", "--comando", help="ejecuta un comando y termina")
     parser.add_argument("--voz", action="store_true", help="usar micrófono y altavoz")
     parser.add_argument("--datos", help="carpeta de datos (por defecto ./datos_jarvis)")
+    parser.add_argument("--sin-claude", action="store_true",
+                        help="usar solo los comandos fijos, sin Claude")
     args = parser.parse_args(argv)
 
-    jarvis = Jarvis(data_dir=args.datos)
+    jarvis = Jarvis(data_dir=args.datos, brain=False if args.sin_claude else None)
 
     if args.comando:
         print(jarvis.handle(args.comando))
@@ -41,6 +47,10 @@ def main(argv=None) -> int:
 
     for msg in jarvis.startup():
         say(msg)
+    if jarvis.brain:
+        print(f"(conectado a Claude: {jarvis.brain.model})")
+    elif not args.sin_claude:
+        print("(Claude desactivado: define ANTHROPIC_API_KEY para conectarlo)")
     say("A tu servicio. Di 'ayuda' para ver los comandos.")
 
     while not jarvis.should_exit:

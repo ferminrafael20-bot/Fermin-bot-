@@ -3,6 +3,7 @@ numpy>=1.24.0
 ccxt>=4.0.0
 pytest>=7.0.0
 openpyxl>=3.1.0
+anthropic>=2.8.0   # cerebro de Jarvis con Claude
 
 # Opcional, solo para el modo voz de Jarvis:
 # SpeechRecognition>=3.10
