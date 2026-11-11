@@ -1,59 +1,59 @@
-"""Arranca Jarvis.
+"""Arranca Alfred.
 
-    python -m jarvis                       # modo texto (escribes los comandos)
-    python -m jarvis --voz                 # modo voz (requiere micrófono)
-    python -m jarvis -c "gasté 20 en café" # ejecuta un solo comando y sale
-    python -m jarvis --sin-claude          # solo comandos fijos, sin Claude
+    python -m alfred                       # modo texto (escribes los comandos)
+    python -m alfred --voz                 # modo voz (requiere micrófono)
+    python -m alfred -c "gasté 20 en café" # ejecuta un solo comando y sale
+    python -m alfred --sin-claude          # solo comandos fijos, sin Claude
 
 Si hay credenciales de Anthropic (ANTHROPIC_API_KEY), lo que no entienda un
-comando fijo lo responde Claude, que además puede usar los comandos de Jarvis.
+comando fijo lo responde Claude, que además puede usar los comandos de Alfred.
 
-Para el reporte a fin de mes, Jarvis lo genera solo al arrancar si el mes
+Para el reporte a fin de mes, Alfred lo genera solo al arrancar si el mes
 anterior aún no tiene reporte. También puedes programarlo (cron / Programador
 de tareas) el día 1 de cada mes:
-    python -m jarvis -c "reporte del mes pasado"
+    python -m alfred -c "reporte del mes pasado"
 """
 
 import argparse
 import sys
 
-from jarvis.core import Jarvis
+from alfred.core import Alfred
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Jarvis, tu asistente personal")
+    parser = argparse.ArgumentParser(description="Alfred, tu asistente personal")
     parser.add_argument("-c", "--comando", help="ejecuta un comando y termina")
     parser.add_argument("--voz", action="store_true", help="usar micrófono y altavoz")
-    parser.add_argument("--datos", help="carpeta de datos (por defecto ./datos_jarvis)")
+    parser.add_argument("--datos", help="carpeta de datos (por defecto ./datos_alfred)")
     parser.add_argument("--sin-claude", action="store_true",
                         help="usar solo los comandos fijos, sin Claude")
     args = parser.parse_args(argv)
 
-    jarvis = Jarvis(data_dir=args.datos, brain=False if args.sin_claude else None)
+    alfred = Alfred(data_dir=args.datos, brain=False if args.sin_claude else None)
 
     if args.comando:
-        print(jarvis.handle(args.comando))
+        print(alfred.handle(args.comando))
         return 0
 
     voice = None
     if args.voz:
-        from jarvis.voice import Voice
+        from alfred.voice import Voice
         voice = Voice()
 
     def say(text: str) -> None:
-        print(f"Jarvis: {text}")
+        print(f"Alfred: {text}")
         if voice:
             voice.say(text.split("\n")[0] if len(text) > 300 else text)
 
-    for msg in jarvis.startup():
+    for msg in alfred.startup():
         say(msg)
-    if jarvis.brain:
-        print(f"(conectado a Claude: {jarvis.brain.model})")
+    if alfred.brain:
+        print(f"(conectado a Claude: {alfred.brain.model})")
     elif not args.sin_claude:
         print("(Claude desactivado: define ANTHROPIC_API_KEY para conectarlo)")
     say("A tu servicio. Di 'ayuda' para ver los comandos.")
 
-    while not jarvis.should_exit:
+    while not alfred.should_exit:
         try:
             if voice:
                 print("(escuchando...)")
@@ -66,7 +66,7 @@ def main(argv=None) -> int:
         except (EOFError, KeyboardInterrupt):
             print()
             break
-        say(jarvis.handle(texto))
+        say(alfred.handle(texto))
     return 0
 
 

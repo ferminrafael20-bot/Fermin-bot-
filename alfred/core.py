@@ -1,8 +1,8 @@
-"""Núcleo de Jarvis: registro de comandos, contexto y despacho.
+"""Núcleo de Alfred: registro de comandos, contexto y despacho.
 
 Cada comando se registra con el decorador ``@command`` indicando una o más
-expresiones regulares. Jarvis normaliza lo que dices (minúsculas, sin tildes,
-sin la palabra "jarvis" al inicio) y ejecuta el primer comando cuyo patrón
+expresiones regulares. Alfred normaliza lo que dices (minúsculas, sin tildes,
+sin la palabra "alfred" al inicio) y ejecuta el primer comando cuyo patrón
 coincida, por orden de prioridad.
 """
 
@@ -23,11 +23,11 @@ StartupHook = Callable[["Context"], "str | None"]
 
 
 def normalize(text: str) -> str:
-    """Minúsculas, sin tildes, sin signos sobrantes y sin el nombre 'jarvis'."""
+    """Minúsculas, sin tildes, sin signos sobrantes y sin el nombre 'alfred'."""
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c)).lower().strip()
     text = re.sub(r"[¿?¡!]", "", text)
-    text = re.sub(r"^(oye\s+|hey\s+)?jarvis[\s,:.]*", "", text)
+    text = re.sub(r"^(oye\s+|hey\s+)?alfred(?:o)?[\s,:.]*", "", text)
     return re.sub(r"\s+", " ", text).strip(" .")
 
 
@@ -47,10 +47,10 @@ _STARTUP_HOOKS: list[StartupHook] = []
 
 def command(name: str, patterns: list[str] | str, help: str = "",
             examples: tuple[str, ...] | list[str] = (), priority: int = 50):
-    """Registra una función como comando de Jarvis.
+    """Registra una función como comando de Alfred.
 
     La función recibe ``(ctx, match, texto_original)`` y devuelve la respuesta
-    (texto) que Jarvis dirá. Los patrones se comparan contra el texto
+    (texto) que Alfred dirá. Los patrones se comparan contra el texto
     normalizado (minúsculas y sin tildes). Menor ``priority`` = se prueba antes.
     """
     if isinstance(patterns, str):
@@ -67,7 +67,7 @@ def command(name: str, patterns: list[str] | str, help: str = "",
 
 
 def on_startup(fn: StartupHook) -> StartupHook:
-    """Registra una función que se ejecuta al arrancar Jarvis (p. ej. reportes)."""
+    """Registra una función que se ejecuta al arrancar Alfred (p. ej. reportes)."""
     if fn not in _STARTUP_HOOKS:
         _STARTUP_HOOKS.append(fn)
     return fn
@@ -78,7 +78,7 @@ def registered_commands() -> list[Command]:
 
 
 def load_commands() -> None:
-    """Importa todos los módulos de ``jarvis/commands`` (descubrimiento automático)."""
+    """Importa todos los módulos de ``alfred/commands`` (descubrimiento automático)."""
     from . import commands as pkg
 
     for mod in pkgutil.iter_modules(pkg.__path__):
@@ -100,13 +100,13 @@ class Context:
 
 
 def default_data_dir() -> Path:
-    return Path(os.environ.get("JARVIS_DATA_DIR", "datos_jarvis")).expanduser()
+    return Path(os.environ.get("ALFRED_DATA_DIR", "datos_alfred")).expanduser()
 
 
 UNKNOWN = "No entendí ese comando. Di 'ayuda' para ver lo que sé hacer."
 
 
-class Jarvis:
+class Alfred:
     """Asistente. Si se le pasa un ``brain`` (p. ej. Claude), le envía lo que
     ningún comando fijo entiende. ``brain=True`` lo crea con la configuración
     por defecto; ``None`` lo activa solo si hay credenciales de Anthropic."""

@@ -43,8 +43,8 @@ strategies/
   strategy_5_stochastic_ema.py
 data.py                         # descarga OHLCV vía ccxt + datos sintéticos de prueba
 main.py                         # demo: aplica las 5 estrategias a los 4 símbolos
-tests/                          # pruebas unitarias con pytest (incluye Jarvis)
-jarvis/                         # asistente personal (ver sección Jarvis)
+tests/                          # pruebas unitarias con pytest (incluye Alfred)
+alfred/                         # asistente personal (ver sección Alfred)
 pinescript/                     # las mismas 5 estrategias en Pine Script v5 (TradingView)
 ```
 
@@ -86,26 +86,26 @@ pytest tests/ -v
 
 ---
 
-# 🤖 Jarvis — asistente personal
+# 🤖 Alfred — asistente personal
 
-Prototipo de asistente tipo Jarvis, en español, pensado para **ir agregándole
+Prototipo de asistente personal (estilo Jarvis), en español, pensado para **ir agregándole
 comandos**. Funciona por texto o por voz.
 
 ```bash
-python -m jarvis                         # modo texto
-python -m jarvis --voz                   # modo voz (micrófono + altavoz)
-python -m jarvis -c "gasté 20 en café"   # un solo comando
+python -m alfred                         # modo texto
+python -m alfred --voz                   # modo voz (micrófono + altavoz)
+python -m alfred -c "gasté 20 en café"   # un solo comando
 ```
 
 ## Conectado con Claude 🧠
 
 Si configuras tu clave de la API de Anthropic, todo lo que no entienda un
 comando fijo lo responde **Claude**. Claude conversa contigo, recuerda la
-conversación y **puede usar los comandos de Jarvis**:
+conversación y **puede usar los comandos de Alfred**:
 
 ```bash
 export ANTHROPIC_API_KEY="tu-clave"   # Windows: set ANTHROPIC_API_KEY=tu-clave
-python -m jarvis
+python -m alfred
 ```
 
 Ejemplos que solo funcionan con Claude:
@@ -123,11 +123,11 @@ agregues también los puede usar Claude sin tocar nada más.
 | Variable | Para qué | Por defecto |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Tu clave (consíguela en console.anthropic.com) | — |
-| `JARVIS_MODEL` | Modelo de Claude | `claude-opus-5-5` |
-| `JARVIS_EFFORT` | `low` (rápido), `medium` o `high` (piensa más) | `low` |
+| `ALFRED_MODEL` | Modelo de Claude | `claude-opus-5-5` |
+| `ALFRED_EFFORT` | `low` (rápido), `medium` o `high` (piensa más) | `low` |
 
 Di "nueva conversación" para que Claude olvide la charla, o arranca con
-`python -m jarvis --sin-claude` para usar solo los comandos fijos. Cada
+`python -m alfred --sin-claude` para usar solo los comandos fijos. Cada
 consulta a Claude tiene un costo según el uso de la API.
 
 ## Lo que sabe hacer
@@ -141,34 +141,34 @@ consulta a Claude tiene un costo según el uso de la API.
 | Señales de trading | "señal de btc", "qué dice la estrategia macd en sol", "señal de oro con datos de prueba" |
 | Generales | "ayuda", "¿qué hora es?", "¿qué día es hoy?", "adiós" |
 
-**Gastos:** se guardan en `datos_jarvis/gastos.xlsx` (puedes abrirlo con Excel)
+**Gastos:** se guardan en `datos_alfred/gastos.xlsx` (puedes abrirlo con Excel)
 y se clasifican solos por palabras clave (Comida, Transporte, Hogar,
 Servicios, Salud, Ocio, Compras, Educación, Finanzas, Otros). Las palabras
-clave están en `CATEGORIAS` dentro de `jarvis/expenses.py`.
+clave están en `CATEGORIAS` dentro de `alfred/expenses.py`.
 
 **Reporte de fin de mes:** al arrancar el primer día de un mes nuevo,
-Jarvis crea solo `datos_jarvis/reportes/reporte_AAAA-MM.xlsx` del mes que
+Alfred crea solo `datos_alfred/reportes/reporte_AAAA-MM.xlsx` del mes que
 terminó, con una hoja de resumen y gráfico de torta por categoría, una de
 gasto diario con gráfico de barras y una con el detalle. Si quieres que se
-genere aunque no abras Jarvis, prográmalo el día 1 de cada mes:
+genere aunque no abras Alfred, prográmalo el día 1 de cada mes:
 
 ```bash
 # cron (Linux/macOS): día 1 a las 8:00
-0 8 1 * * cd /ruta/Fermin-bot- && python -m jarvis -c "reporte del mes pasado"
+0 8 1 * * cd /ruta/Fermin-bot- && python -m alfred -c "reporte del mes pasado"
 ```
 
-**Voz:** `pip install SpeechRecognition pyttsx3 pyaudio`. El reconocimiento
+**Voz:** di "Alfred" (o "Alfredo") al inicio si quieres; se ignora solo. `pip install SpeechRecognition pyttsx3 pyaudio`. El reconocimiento
 de voz usa Google (requiere internet) y la respuesta hablada funciona offline.
 
 ## Cómo agregar un comando nuevo
 
-1. Copia `jarvis/commands/_plantilla.py` a `jarvis/commands/mi_comando.py`.
+1. Copia `alfred/commands/_plantilla.py` a `alfred/commands/mi_comando.py`.
    Cualquier archivo de esa carpeta se carga solo; los que empiezan por `_`
    se ignoran.
 2. Define la función con `@command`:
 
 ```python
-from jarvis.core import command
+from alfred.core import command
 
 @command("recordatorio", r"^recuerdame (.+)$",
          help="Guarda un recordatorio.", examples=["recuérdame pagar la luz"])
@@ -178,12 +178,12 @@ def recordatorio(ctx, match, texto):
 ```
 
 Los patrones se comparan con el texto **en minúsculas y sin tildes** (escribe
-"recuerdame", no "recuérdame"), y la palabra "Jarvis" al inicio se quita
+"recuerdame", no "recuérdame"), y la palabra "Alfred" al inicio se quita
 sola. Si necesitas algo al arrancar (como el reporte automático), usa el
 decorador `@on_startup`.
 
 ```
-jarvis/
+alfred/
   core.py           # registro de comandos, normalización y despacho
   expenses.py       # Excel de gastos, categorías y reportes
   brain.py          # conexión con Claude (herramientas e historial)

@@ -1,6 +1,6 @@
 """PLANTILLA para crear un comando nuevo.
 
-1. Copia este archivo dentro de jarvis/commands/ con otro nombre, SIN el
+1. Copia este archivo dentro de alfred/commands/ con otro nombre, SIN el
    guion bajo inicial (p. ej. ``clima.py``). Se cargará solo al arrancar.
 2. Cambia el nombre, los patrones y la lógica.
 
@@ -8,7 +8,7 @@ Los patrones se comparan contra el texto en minúsculas y sin tildes,
 así que escribe "cuanto" en vez de "cuánto".
 """
 
-from jarvis.core import command
+from alfred.core import command
 
 
 @command(

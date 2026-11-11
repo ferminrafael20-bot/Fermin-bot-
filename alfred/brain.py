@@ -1,7 +1,7 @@
-"""Cerebro de Jarvis con Claude (API de Anthropic).
+"""Cerebro de Alfred con Claude (API de Anthropic).
 
-Cuando ningún comando fijo entiende la frase, Jarvis se la pasa a Claude.
-Claude conversa en español y puede usar herramientas de Jarvis:
+Cuando ningún comando fijo entiende la frase, Alfred se la pasa a Claude.
+Claude conversa en español y puede usar herramientas de Alfred:
 
 * ``registrar_gasto``: anota gastos aunque los digas de forma libre
   ("ayer almorcé con Ana y pagué la mitad de 600").
@@ -11,8 +11,8 @@ Claude conversa en español y puede usar herramientas de Jarvis:
 
 Configuración por variables de entorno:
   ANTHROPIC_API_KEY  clave de la API (o un perfil de ``ant auth login``)
-  JARVIS_MODEL       modelo (por defecto claude-opus-5-5)
-  JARVIS_EFFORT      low | medium | high (por defecto low: respuestas rápidas)
+  ALFRED_MODEL       modelo (por defecto claude-opus-5-5)
+  ALFRED_EFFORT      low | medium | high (por defecto low: respuestas rápidas)
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from .core import Context, registered_commands
 DEFAULT_MODEL = "claude-opus-5-5"
 MAX_TOOL_ROUNDS = 8
 
-SYSTEM_PROMPT = """Eres Jarvis, el asistente personal de tu usuario. Hablas en español, \
+SYSTEM_PROMPT = """Eres Alfred, el asistente personal de tu usuario. Hablas en español, \
 con un tono cercano y profesional.
 
 Tus respuestas a menudo se leen en voz alta, así que sé breve (normalmente una a tres \
@@ -36,7 +36,7 @@ Tienes herramientas para actuar en el sistema del usuario:
 diga de forma indirecta. Calcula tú el monto si hace falta (por ejemplo, "la mitad de 600" \
 son 300). Si un mensaje menciona varios gastos, regístralos todos. Si no está claro el \
 monto, pregúntalo en vez de inventarlo.
-- ejecutar_comando: ejecuta uno de los comandos de Jarvis escribiendo una frase de ejemplo \
+- ejecutar_comando: ejecuta uno de los comandos de Alfred escribiendo una frase de ejemplo \
 de ese comando. Úsala para resúmenes de gastos, reportes, señales de trading, la hora y \
 cualquier otra cosa que un comando pueda hacer.
 
@@ -72,7 +72,7 @@ def _tools() -> list[dict]:
         },
         {
             "name": "ejecutar_comando",
-            "description": ("Ejecuta un comando de Jarvis a partir de una frase y devuelve su "
+            "description": ("Ejecuta un comando de Alfred a partir de una frase y devuelve su "
                             "respuesta. Escribe la frase igual que los ejemplos. Comandos "
                             f"disponibles:\n{catalogo}"),
             "strict": True,
@@ -97,8 +97,8 @@ class ClaudeBrain:
         self.client = client
         self.ctx = ctx
         self.run_command = run_command  # función texto -> respuesta (solo comandos fijos)
-        self.model = model or os.environ.get("JARVIS_MODEL", DEFAULT_MODEL)
-        self.effort = effort or os.environ.get("JARVIS_EFFORT", "low")
+        self.model = model or os.environ.get("ALFRED_MODEL", DEFAULT_MODEL)
+        self.effort = effort or os.environ.get("ALFRED_EFFORT", "low")
         self.messages: list = []
 
     def reset(self) -> None:
@@ -173,7 +173,7 @@ def claude_available() -> bool:
         import anthropic  # noqa: F401
     except ImportError:
         return False
-    if os.environ.get("JARVIS_CLAUDE", "").lower() in ("0", "no", "off"):
+    if os.environ.get("ALFRED_CLAUDE", "").lower() in ("0", "no", "off"):
         return False
     return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
                 or os.environ.get("ANTHROPIC_PROFILE")

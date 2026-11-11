@@ -4,7 +4,7 @@ Ejemplos: "señal de btc", "qué dice la estrategia macd en sol",
 "señal de oro con datos de prueba".
 """
 
-from jarvis.core import command
+from alfred.core import command
 
 SIMBOLOS = {"btc": "BTC/USDT", "bitcoin": "BTC/USDT", "xrp": "XRP/USDT",
             "ripple": "XRP/USDT", "xaut": "XAUT/USDT", "oro": "XAUT/USDT",

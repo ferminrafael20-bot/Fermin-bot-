@@ -11,8 +11,8 @@ Ejemplos de frases:
 
 import re
 
-from jarvis.core import UNKNOWN, command, on_startup
-from jarvis.expenses import (CATEGORIAS, MESES, OTROS, ExpenseBook, money,
+from alfred.core import UNKNOWN, command, on_startup
+from alfred.expenses import (CATEGORIAS, MESES, OTROS, ExpenseBook, money,
                              parse_expense, summary_text)
 
 VERBOS = (r"^(?:me )?(?:gaste|gasto|pague|compre|invert[ií]|"
@@ -75,7 +75,7 @@ def _mes_objetivo(ctx, texto: str) -> tuple[int, int]:
          examples=["¿cuánto llevo gastado este mes?", "¿cuánto gasté en octubre?"],
          priority=30)
 def resumen(ctx, match, texto):
-    from jarvis.core import normalize
+    from alfred.core import normalize
     y, m = _mes_objetivo(ctx, normalize(texto))
     book = _book(ctx)
     return summary_text(book.summarize(book.month(y, m)), y, m)
@@ -86,7 +86,7 @@ def resumen(ctx, match, texto):
          examples=["reporte del mes", "reporte de octubre", "reporte del mes pasado"],
          priority=30)
 def reporte(ctx, match, texto):
-    from jarvis.core import normalize
+    from alfred.core import normalize
     y, m = _mes_objetivo(ctx, normalize(texto))
     path, s = _book(ctx).build_report(y, m)
     if not path:

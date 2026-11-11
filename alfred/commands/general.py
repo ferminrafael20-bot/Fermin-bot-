@@ -1,6 +1,6 @@
 """Comandos generales: ayuda, hora, fecha, saludo y salir."""
 
-from jarvis.core import command, registered_commands
+from alfred.core import command, registered_commands
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
@@ -18,14 +18,14 @@ def ayuda(ctx, match, texto):
 
 
 @command("salir", [r"^(salir|adios|chao|apagate|exit|quit)$"],
-         help="Cierra Jarvis.", examples=["adiós"], priority=0)
+         help="Cierra Alfred.", examples=["adiós"], priority=0)
 def salir(ctx, match, texto):
     ctx.should_exit = True
     return "Hasta luego."
 
 
 @command("saludo", [r"^(hola|buenos dias|buenas tardes|buenas noches|buenas)\b"],
-         help="Te saluda.", examples=["hola jarvis"], priority=90)
+         help="Te saluda.", examples=["hola alfred"], priority=90)
 def saludo(ctx, match, texto):
     hora = ctx.now().hour
     momento = "Buenos días" if hora < 12 else "Buenas tardes" if hora < 20 else "Buenas noches"

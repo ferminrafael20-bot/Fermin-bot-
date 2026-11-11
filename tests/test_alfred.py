@@ -3,9 +3,9 @@ from datetime import datetime
 import pytest
 from openpyxl import load_workbook
 
-from jarvis import Jarvis, command
-from jarvis.core import normalize
-from jarvis.expenses import ExpenseBook, categorize, parse_expense, parse_number
+from alfred import Alfred, command
+from alfred.core import normalize
+from alfred.expenses import ExpenseBook, categorize, parse_expense, parse_number
 
 
 class Clock:
@@ -17,9 +17,9 @@ class Clock:
 
 
 @pytest.fixture
-def jarvis(tmp_path):
+def alfred(tmp_path):
     clock = Clock(datetime(2026, 10, 15, 10, 30))
-    j = Jarvis(data_dir=tmp_path, clock=clock, brain=False)
+    j = Alfred(data_dir=tmp_path, clock=clock, brain=False)
     j.clock = clock
     return j
 
@@ -43,65 +43,66 @@ def test_parse_expense_and_category():
 
 
 def test_normalize():
-    assert normalize("Oye Jarvis, ¿Cuánto llevo gastado?") == "cuanto llevo gastado"
+    assert normalize("Oye Alfred, ¿Cuánto llevo gastado?") == "cuanto llevo gastado"
+    assert normalize("Alfredo qué hora es") == "que hora es"
 
 
-def test_register_and_summary(jarvis, tmp_path):
-    assert "Comida" in jarvis.handle("gasté 25.50 en el súper")
-    assert "Hogar" in jarvis.handle("Jarvis, pagué 1.200 de renta")
-    assert "Ocio" in jarvis.handle("compré 40 de regalo categoría ocio")
-    resumen = jarvis.handle("¿cuánto llevo gastado este mes?")
+def test_register_and_summary(alfred, tmp_path):
+    assert "Comida" in alfred.handle("gasté 25.50 en el súper")
+    assert "Hogar" in alfred.handle("Alfred, pagué 1.200 de renta")
+    assert "Ocio" in alfred.handle("compré 40 de regalo categoría ocio")
+    resumen = alfred.handle("¿cuánto llevo gastado este mes?")
     assert "$1,265.50" in resumen and "3 gastos" in resumen
 
     ws = load_workbook(tmp_path / "gastos.xlsx")["Gastos"]
     assert ws.max_row == 4
     assert ws["C2"].value == 25.5 and ws["D3"].value == "Hogar"
 
-    assert "regalo" in jarvis.handle("borra el último gasto")
-    assert "2 gastos" in jarvis.handle("resumen de gastos")
+    assert "regalo" in alfred.handle("borra el último gasto")
+    assert "2 gastos" in alfred.handle("resumen de gastos")
 
 
-def test_monthly_report(jarvis, tmp_path):
-    jarvis.handle("gasté 100 en gasolina")
-    jarvis.handle("gasté 50 en farmacia")
-    out = jarvis.handle("reporte del mes")
+def test_monthly_report(alfred, tmp_path):
+    alfred.handle("gasté 100 en gasolina")
+    alfred.handle("gasté 50 en farmacia")
+    out = alfred.handle("reporte del mes")
     path = tmp_path / "reportes" / "reporte_2026-10.xlsx"
     assert str(path) in out and path.exists()
     wb = load_workbook(path)
     assert wb.sheetnames == ["Resumen", "Por día", "Detalle"]
     assert wb["Resumen"]["B3"].value == 150
-    assert "No hay gastos" in jarvis.handle("reporte de marzo")
+    assert "No hay gastos" in alfred.handle("reporte de marzo")
 
 
-def test_auto_report_on_new_month(jarvis, tmp_path):
-    jarvis.handle("gasté 100 en cine")
-    assert jarvis.startup() == []  # el mes aún no termina
-    jarvis.clock.dt = datetime(2026, 11, 1, 9, 0)
-    msgs = jarvis.startup()
+def test_auto_report_on_new_month(alfred, tmp_path):
+    alfred.handle("gasté 100 en cine")
+    assert alfred.startup() == []  # el mes aún no termina
+    alfred.clock.dt = datetime(2026, 11, 1, 9, 0)
+    msgs = alfred.startup()
     assert len(msgs) == 1 and "octubre" in msgs[0]
     assert (tmp_path / "reportes" / "reporte_2026-10.xlsx").exists()
-    assert jarvis.startup() == []  # no lo repite
-    assert "$100.00" in jarvis.handle("cuanto gaste el mes pasado")
+    assert alfred.startup() == []  # no lo repite
+    assert "$100.00" in alfred.handle("cuanto gaste el mes pasado")
 
 
-def test_trading_signal_offline(jarvis):
-    out = jarvis.handle("señal de btc con datos de prueba")
+def test_trading_signal_offline(alfred):
+    out = alfred.handle("señal de btc con datos de prueba")
     assert out.startswith("BTC/USDT") and "datos de prueba" in out
 
 
-def test_new_command_plugin(jarvis):
+def test_new_command_plugin(alfred):
     @command("eco", r"^repite (.+)$", help="Repite lo que dices.")
     def eco(ctx, match, texto):
         return match.group(1)
 
-    assert jarvis.handle("repite hola mundo") == "hola mundo"
-    assert "eco" in jarvis.handle("ayuda")
+    assert alfred.handle("repite hola mundo") == "hola mundo"
+    assert "eco" in alfred.handle("ayuda")
 
 
-def test_unknown_and_exit(jarvis):
-    assert "No entendí" in jarvis.handle("baila salsa")
-    jarvis.handle("adiós")
-    assert jarvis.should_exit
+def test_unknown_and_exit(alfred):
+    assert "No entendí" in alfred.handle("baila salsa")
+    alfred.handle("adiós")
+    assert alfred.should_exit
 
 
 def test_book_month_filter(tmp_path):

@@ -8,9 +8,9 @@ import pytest
 anthropic = pytest.importorskip("anthropic")
 httpx = pytest.importorskip("httpx2")
 
-from jarvis import Jarvis  # noqa: E402
-from jarvis.brain import ClaudeBrain  # noqa: E402
-from jarvis.expenses import ExpenseBook  # noqa: E402
+from alfred import Alfred  # noqa: E402
+from alfred.brain import ClaudeBrain  # noqa: E402
+from alfred.expenses import ExpenseBook  # noqa: E402
 
 
 def _msg(content, stop_reason="end_turn"):
@@ -31,24 +31,24 @@ class FakeAPI:
         return httpx.Response(200, json=self.replies.pop(0))
 
 
-def make_jarvis(tmp_path, replies):
+def make_alfred(tmp_path, replies):
     api = FakeAPI(replies)
     client = anthropic.Anthropic(api_key="test", max_retries=0,
                                  http_client=anthropic.DefaultHttpxClient(transport=httpx.MockTransport(api)))
-    j = Jarvis(data_dir=tmp_path, clock=lambda: datetime(2026, 10, 15, 13, 0), brain=False)
+    j = Alfred(data_dir=tmp_path, clock=lambda: datetime(2026, 10, 15, 13, 0), brain=False)
     j.brain = ClaudeBrain(j.ctx, j.run_command, client=client)
     j.ctx.extras["brain"] = j.brain
     return j, api
 
 
 def test_fixed_commands_do_not_call_claude(tmp_path):
-    j, api = make_jarvis(tmp_path, [])
+    j, api = make_alfred(tmp_path, [])
     assert "Comida" in j.handle("gasté 20 en pizza")
     assert api.requests == []
 
 
 def test_claude_registers_free_form_expenses(tmp_path):
-    j, api = make_jarvis(tmp_path, [
+    j, api = make_alfred(tmp_path, [
         _msg([{"type": "thinking", "thinking": "", "signature": "sig"},
               {"type": "tool_use", "id": "tu_1", "name": "registrar_gasto",
                "input": {"monto": 300, "descripcion": "almuerzo con ana", "categoria": "Comida"}},
@@ -76,13 +76,13 @@ def test_claude_registers_free_form_expenses(tmp_path):
 
 
 def test_multi_amount_phrase_goes_to_claude(tmp_path):
-    j, api = make_jarvis(tmp_path, [_msg([{"type": "text", "text": "Hecho."}])])
+    j, api = make_alfred(tmp_path, [_msg([{"type": "text", "text": "Hecho."}])])
     assert j.handle("gasté 300 en comida y 200 en uber") == "Hecho."
     assert len(api.requests) == 1
 
 
 def test_claude_can_run_any_command(tmp_path):
-    j, api = make_jarvis(tmp_path, [
+    j, api = make_alfred(tmp_path, [
         _msg([{"type": "tool_use", "id": "tu_1", "name": "ejecutar_comando",
                "input": {"frase": "qué hora es"}}], stop_reason="tool_use"),
         _msg([{"type": "text", "text": "Es la una de la tarde."}]),
@@ -96,7 +96,7 @@ def test_claude_can_run_any_command(tmp_path):
 
 
 def test_conversation_memory_and_reset(tmp_path):
-    j, api = make_jarvis(tmp_path, [_msg([{"type": "text", "text": "Hola Fermín."}]),
+    j, api = make_alfred(tmp_path, [_msg([{"type": "text", "text": "Hola Fermín."}]),
                                     _msg([{"type": "text", "text": "Te llamas Fermín."}])])
     j.handle("me llamo Fermín")
     j.handle("¿cómo me llamo?")
@@ -106,7 +106,7 @@ def test_conversation_memory_and_reset(tmp_path):
 
 
 def test_refusal_and_api_errors(tmp_path):
-    j, api = make_jarvis(tmp_path, [_msg([], stop_reason="refusal")])
+    j, api = make_alfred(tmp_path, [_msg([], stop_reason="refusal")])
     assert "no puedo" in j.handle("algo raro")
 
     def boom(request):
